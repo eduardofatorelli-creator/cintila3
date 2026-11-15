@@ -321,6 +321,7 @@ export class Game implements Jogo {
     this.entrada();
     if (this.estado === 'fim') return;
     if (this.escolha) { this.escolha.t -= dt; if (this.escolha.t <= 0) this.escolher(this.escolha.i); }
+    if (this.estado === 'jogo') this.tempoJogo += dt;
     if (this.trans) { this.passoTrans(dt); return; }
     if (this.estado === 'bonus') { this.bonusT -= dt; if (this.bonusT <= 0) this.proximaBola(); return; }
     const d = dt * this.ritmo;
@@ -331,7 +332,7 @@ export class Game implements Jogo {
       return;
     }
     this.mesa.passo(d);
-    if (this.estado === 'jogo') this.tempoJogo += dt;
+    if (this.trans || this.sub) return; // a bola acabou de subir para outro campo neste mesmo passo
     if (this.salva > 0 && this.estado === 'jogo') this.salva -= dt;
     if (this.dobro > 0) this.dobro -= dt;
     if (this.certeiraT > 0) { this.certeiraT -= dt; if (this.certeiraT <= 0) this.m.faixas.certeira = -1; }

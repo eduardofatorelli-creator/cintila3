@@ -238,11 +238,11 @@ export class Resgate extends Base {
   tipo = 'resgate'; armado = false; x: number;
   constructor(J: Jogo, C: Campo, public lado: number) { super(J, C); this.x = lado > 0 ? 37 : 343; this.y = 712; }
   colidir(b: Bola) {
-    if (!this.armado || b.y < 700 || b.y > 748 || Math.abs(b.x - this.x) > 18) return;
-    b.x = this.x; b.vx = this.lado * 20; b.vy = -1280; b.lateral = false; this.armado = false; this.flash = 1; this.J.ev('resgate', b, this);
+    if (!this.armado || b.y < 676 || b.y > 712 || Math.abs(b.x - this.x) > 18) return;
+    b.x = Math.max(this.x - 6, Math.min(this.x + 6, b.x)); b.vx = this.lado * 20; b.vy = -1280; b.lateral = false; this.armado = false; this.flash = 1; this.J.ev('resgate', b, this);
   }
-  desenhar(g: Gfx) { g.cil(this.x, 728, 7, this.armado ? 8 : 3, this.armado ? this.J.cores.c1 : '#334', this.armado ? '#fff' : '#445'); }
-  luzes(g: Gfx) { g.luz(this.x, 690, 7, '#7dffb0', this.armado ? (g.pisca(2) ? 1 : 0.6) : 0.1, 'RESGATE'); }
+  desenhar(g: Gfx) { g.cil(this.x, 706, 7, this.armado ? 8 : 3, this.armado ? this.J.cores.c1 : '#334', this.armado ? '#fff' : '#445'); }
+  luzes(g: Gfx) { g.luz(this.x, 684, 7, '#7dffb0', this.armado ? (g.pisca(2) ? 1 : 0.6) : 0.1, 'RESGATE'); }
 }
 
 export class PosteCentral extends Base {

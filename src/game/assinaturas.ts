@@ -202,7 +202,7 @@ export const ASSINATURAS: Record<string, Fab> = {
   calor(J, p) {
     let c = 0;
     return {
-      nome: p.nome, info: () => 'CALOR ' + Math.round(c) + '%', medidor: () => c / 100, mult: () => 1 + c / 50, ritmo: () => 1 + c / 450,
+      nome: p.nome, info: () => 'CALOR ' + Math.round(c) + '%', medidor: () => c / 100, mult: () => 1 + c / 50, ritmo: () => 1 + c / 800,
       update(dt) { c = Math.max(0, c - dt * 5); },
       ev(t, b) { if (!GOLPES.includes(t)) return; c = Math.min(100, c + (t === 'bumper' ? 5 : 12)); if (c >= 100) { c = 45; J.assinou(b, 60000, 'SUPERAQUECIMENTO!'); J.pisca('#ff7a1a', 0.8); J.tremor = 0.8; } },
     };

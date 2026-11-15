@@ -52,7 +52,7 @@ export function montaMesa(J: Jogo, def: MachineDef): Mesa {
   add(new P.CanaletaExterna(J, C, 1)); add(new P.CanaletaExterna(J, C, -1));
   const resgE = add(new P.Resgate(J, C, 1)), resgD = add(new P.Resgate(J, C, -1));
   const poste = add(new P.PosteCentral(J, C));
-  const muros = [add(new P.Poste(J, C, 54, 630, 5.7)), add(new P.Poste(J, C, 326, 630, 5.7))];
+  const muros = [add(new P.Poste(J, C, 57, 620, 5.7)), add(new P.Poste(J, C, 323, 620, 5.7))];
   const giro = add(new P.Giro(J, C, L.giro === 'dir' ? 343 : 37, 346));
   const bumpers = L.bumpers.map((b, i) => add(new P.Bumper(J, C, b[0], b[1], b[2] || 17, i)));
   const alvos = L.alvos.map(a => add(new P.AlvoFixo(J, C, a[0], a[1], a[2])));

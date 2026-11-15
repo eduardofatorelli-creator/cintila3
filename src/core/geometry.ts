@@ -21,12 +21,13 @@ export function parteDeBaixo(c: Campo, cor: string): Baixo {
     // guia de retorno: joga a bola descendo para dentro; de baixo para cima a bola passa (resgate)
     const dx = m(62) - m(20), dy = 28, L = Math.hypot(dx, dy);
     let nx = dy / L, ny = -dx / L; if (ny > 0) { nx = -nx; ny = -ny; }
-    r['guia' + sufixo] = c.parede([[m(20), 572], [m(62), 600]], E_ARCO, { cor, nx, ny })[0];
+    r['guia' + sufixo] = c.parede([[m(20), 572], [m(62), 600]], 0.2, { cor, nx, ny })[0];
     c.parede([[m(54), 630], [m(54), 700]], E_PAREDE, { cor });
     // piso da entrada interna: entrega em cima da palheta, um pouco além do pivô
     c.parede([[m(54), 640], [m(128), 673], [m(124), 690]], E_ARCO, { cor });
     // estilingue: triângulo A B C, a face ativa A→C é registrada pela peça
-    c.parede([[m(86), 568], [m(86), 624], [m(128), 632]], E_BORRACHA, { cor });
+    // costas do estilingue amortecidas: a bola que vem do guia cai na entrada interna em vez de quicar para fora
+    c.parede([[m(86), 568], [m(86), 624]], 0.1, { cor }); c.parede([[m(86), 624], [m(128), 632]], E_BORRACHA, { cor });
     r['est' + sufixo] = seg(m(86), 568, m(128), 632, E_BORRACHA, { cor, tipo: 'estilingue' });
     c.segs.push(r['est' + sufixo]);
   }
