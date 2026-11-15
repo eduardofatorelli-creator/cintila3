@@ -101,7 +101,7 @@ function palheta(g: Pintor, p: Palheta, c1: string, c2: string) {
 export function desenhaBola(g: Pintor, b: { x: number; y: number; z: number; r: number; cor?: string; rastro: number[] }, cor: string) {
   if (b.z < -1) return;
   const c = g.c, r = b.rastro;
-  for (let i = 0; i < r.length - 2; i += 2) { const u = i / r.length; g.disco(r[i], r[i + 1], b.r * (0.3 + u * 0.6), b.cor || cor, 7 + b.z, u * 0.28); }
+  if (!g.semBrilho) for (let i = 0; i < r.length - 2; i += 2) { const u = i / r.length; g.disco(r[i], r[i + 1], b.r * (0.3 + u * 0.6), b.cor || cor, 7 + b.z, u * 0.28); }
   const [sx, sy, sk] = g.p(b.x, b.y + 2, 0);
   c.fillStyle = 'rgba(0,0,0,0.55)'; c.beginPath(); c.ellipse(sx, sy, b.r * sk * (1 + b.z * 0.01), b.r * sk * 0.45, 0, 0, TAU); c.fill();
   const [X, Y, K] = g.p(b.x, b.y, 7 + b.z), R = b.r * K;

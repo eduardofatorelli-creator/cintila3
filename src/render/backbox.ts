@@ -87,7 +87,7 @@ const ANIMS: Record<string, [number, Desenho]> = {
 
 export class Backbox {
   private dmdTela: HTMLCanvasElement; private d: Ctx; private fila: Anim[] = []; private atual: Anim | null = null;
-  camadas: HTMLCanvasElement[] = []; private mascara: HTMLCanvasElement | null = null; private mascW = 0;
+  camadas: HTMLCanvasElement[] = []; private pronto: HTMLCanvasElement | null = null; private quadro = 0; private mascara: HTMLCanvasElement | null = null; private mascW = 0;
   constructor() { [this.dmdTela, this.d] = novaTela(LW, LH); }
   /** pinta a arte de backglass da máquina em 3 camadas */
   static vidro(def: MachineDef, w = 400, h = 228, esc = 2): HTMLCanvasElement[] {
@@ -159,9 +159,17 @@ export class Backbox {
     }
     // painel de matriz de pontos
     const dw = Math.min(r.w - m * 4, (r.h * 0.5) * 3), dh = dw / 3, dx = r.x + (r.w - dw) / 2, dy = r.y + r.h - dh - m * 1.6, d = this.d;
+    // modo econômico: o painel é redesenhado a 30 Hz e copiado pronto (pontos + grade) nos outros quadros
+    this.quadro++; const W2 = Math.round(dw), H2 = Math.round(dh);
+    if (soPainel && this.pronto && this.pronto.width === W2 && this.quadro % 2) { c.drawImage(this.pronto, dx, dy, dw, dh); return; }
     d.setTransform(1, 0, 0, 1, 0, 0); d.globalAlpha = 1; d.fillStyle = '#06030a'; d.fillRect(0, 0, LW, LH);
     if (this.atual) { const A = this.atual; d.save(); ANIMS[A.a.tipo][1](d, A.t / A.dur, A.a, k, J!, t); d.restore(); d.globalAlpha = 1; }
     else if (J) this.base(d, J, t); else if (atracao) atracao(d, t);
+    if (soPainel) {
+      if (!this.pronto || this.pronto.width !== W2) { this.pronto = novaTela(W2, H2)[0]; }
+      const pc = this.pronto.getContext('2d')!; pc.imageSmoothingEnabled = false; pc.drawImage(this.dmdTela, 0, 0, W2, H2); pc.drawImage(this.grade(W2), 0, 0, W2, H2);
+      c.drawImage(this.pronto, dx, dy, dw, dh); return;
+    }
     c.fillStyle = '#000'; c.fillRect(dx - 4, dy - 4, dw + 8, dh + 8); c.strokeStyle = '#2a2e4a'; c.lineWidth = 2; c.strokeRect(dx - 4, dy - 4, dw + 8, dh + 8);
     c.imageSmoothingEnabled = false; c.drawImage(this.dmdTela, dx, dy, dw, dh); c.imageSmoothingEnabled = true;
     c.drawImage(this.grade(Math.round(dw)), dx, dy, dw, dh);
