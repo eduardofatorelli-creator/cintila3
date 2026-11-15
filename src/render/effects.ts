@@ -7,7 +7,7 @@ interface Part { x: number; y: number; z: number; vx: number; vy: number; vz: nu
 
 
 export class Efeitos {
-  ps: Part[] = []; max = 300; simples = false; private bloomTela: HTMLCanvasElement | null = null; bloom: CanvasRenderingContext2D | null = null;
+  ps: Part[] = []; max = 300; simples = false; semBloom = false; private bloomTela: HTMLCanvasElement | null = null; bloom: CanvasRenderingContext2D | null = null;
   private temFiltro = typeof CanvasRenderingContext2D !== 'undefined' && 'filter' in CanvasRenderingContext2D.prototype;
   recebe(fila: FxEv[]) {
     for (const e of fila) {

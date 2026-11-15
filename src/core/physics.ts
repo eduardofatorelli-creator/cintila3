@@ -33,11 +33,12 @@ export const seg = (ax: number, ay: number, bx: number, by: number, e = E_PAREDE
   ({ ax, ay, bx, by, e, ...extra });
 
 export class Palheta {
-  ang: number; w = 0; on = false; base = 60; extra = 0;
+  px0 = 0;
+  ang: number; w = 0; on = false; base = 55; extra = 0;
   repouso = 0.5; alto = -0.52; sobe = 27; desce = 15; r0 = 6.5; r1 = 4.1;
   /** escorregamento (gelo): atraso em segundos antes de responder */
   atraso = 0; private fila = 0; private alvoOn = false;
-  constructor(public px: number, public py: number, public lado: 1 | -1, comp = 60) { this.base = comp; this.ang = this.repouso; }
+  constructor(public px: number, public py: number, public lado: 1 | -1, comp = 55) { this.base = comp; this.ang = this.repouso; this.px0 = px; }
   get comp() { return this.base + this.extra; }
   get tx() { return this.px + this.lado * Math.cos(this.ang) * this.comp; }
   get ty() { return this.py + Math.sin(this.ang) * this.comp; }

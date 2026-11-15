@@ -146,15 +146,17 @@ export class Backbox {
     else { for (let i = 0; i < 5; i++) { d.fillStyle = J.missoes[i].feita ? k.c1 : '#334'; d.fillRect(60 + i * 15, 52, 12, 6); } }
   }
 
-  desenha(c: Ctx, r: Ret, J: Game | null, t: number, px = 0.5, py = 0.5, atracao?: (d: Ctx, t: number) => void) {
+  desenha(c: Ctx, r: Ret, J: Game | null, t: number, px = 0.5, py = 0.5, atracao?: (d: Ctx, t: number) => void, soPainel = false) {
     const k = J ? J.cores : { c1: '#7df9ff', c2: '#b48cff', c3: '#ff6fb5' }, m = Math.max(4, r.h * 0.035);
     // moldura do gabinete e arte de backglass em paralaxe
+    if (!soPainel) {
     c.fillStyle = '#0a0c18'; c.fillRect(r.x, r.y, r.w, r.h);
     c.save(); c.beginPath(); c.rect(r.x + m, r.y + m, r.w - m * 2, r.h - m * 2); c.clip();
     this.camadas.forEach((tela, i) => { const d = (i + 1) * 3 * (r.w / 400); c.drawImage(tela, r.x + m - d + (0.5 - px) * d * 2, r.y + m - d * 0.5 + (0.5 - py) * d, r.w - m * 2 + d * 2, r.h - m * 2 + d); });
     const gs = c.createLinearGradient(0, r.y, 0, r.y + r.h); gs.addColorStop(0, 'rgba(0,0,0,0)'); gs.addColorStop(0.5, 'rgba(0,0,0,0.05)'); gs.addColorStop(1, 'rgba(0,0,0,0.7)'); c.fillStyle = gs; c.fillRect(r.x, r.y, r.w, r.h);
     c.restore();
     c.strokeStyle = k.c2; c.lineWidth = Math.max(2, m * 0.5); c.strokeRect(r.x + m / 2, r.y + m / 2, r.w - m, r.h - m);
+    }
     // painel de matriz de pontos
     const dw = Math.min(r.w - m * 4, (r.h * 0.5) * 3), dh = dw / 3, dx = r.x + (r.w - dw) / 2, dy = r.y + r.h - dh - m * 1.6, d = this.d;
     d.setTransform(1, 0, 0, 1, 0, 0); d.globalAlpha = 1; d.fillStyle = '#06030a'; d.fillRect(0, 0, LW, LH);

@@ -1,14 +1,17 @@
 // Monta a mesa principal a partir dos dados de uma máquina.
 import { Campo, G, Palheta } from '../core/physics';
-import { contorno, parteDeBaixo, PIVO_D, PIVO_E } from '../core/geometry';
+import { Baixo, contorno, parteDeBaixo, PIVO_D, PIVO_E } from '../core/geometry';
 import type { MachineDef } from '../machines/_schema';
 import * as P from './elements';
 import type { Jogo } from './tipos';
 
+/** Poste de borracha na boca da canaleta externa. A posição regula o dreno lateral (meta: 5% a 8% dos drenos). */
+export const POSTE_CANALETA = [54, 633];
+
 export interface Mesa {
   campo: Campo; pE: Palheta; pD: Palheta; poste: P.PosteCentral; resgE: P.Resgate; resgD: P.Resgate;
   portal: P.Portal; trava: P.TravaDeBola; rampas: P.Rampa[]; orbitas: P.Orbita[]; chefe: P.Chefe; faixas: P.Faixas;
-  bumpers: P.Bumper[]; alvos: P.AlvoFixo[]; banco: P.BancoDeQueda; muros: P.Poste[]; giro: P.Giro; retornos: P.Sensor[];
+  baixo: Baixo; bumpers: P.Bumper[]; alvos: P.AlvoFixo[]; banco: P.BancoDeQueda; muros: P.Poste[]; giro: P.Giro; retornos: P.Sensor[];
 }
 
 /** Fábricas das peças avulsas que um layout pode pedir em `extras`. */
@@ -52,12 +55,12 @@ export function montaMesa(J: Jogo, def: MachineDef): Mesa {
   add(new P.CanaletaExterna(J, C, 1)); add(new P.CanaletaExterna(J, C, -1));
   const resgE = add(new P.Resgate(J, C, 1)), resgD = add(new P.Resgate(J, C, -1));
   const poste = add(new P.PosteCentral(J, C));
-  const muros = [add(new P.Poste(J, C, 57, 620, 5.7)), add(new P.Poste(J, C, 323, 620, 5.7))];
+  const muros = [add(new P.Poste(J, C, POSTE_CANALETA[0], POSTE_CANALETA[1], 5.7)), add(new P.Poste(J, C, 380 - POSTE_CANALETA[0], POSTE_CANALETA[1], 5.7))];
   const giro = add(new P.Giro(J, C, L.giro === 'dir' ? 343 : 37, 346));
   const bumpers = L.bumpers.map((b, i) => add(new P.Bumper(J, C, b[0], b[1], b[2] || 17, i)));
   const alvos = L.alvos.map(a => add(new P.AlvoFixo(J, C, a[0], a[1], a[2])));
   const banco = add(new P.BancoDeQueda(J, C, L.banco[0], L.banco[1], L.banco[2], L.banco[3]));
   const chefe = add(new P.Chefe(J, C, L.chefe[0], L.chefe[1], def.chefe.forma, def.chefe.modo));
   for (const e of L.extras || []) { const f = PECAS[e.t]; if (f) add(f(J, C, e)); }
-  return { campo: C, pE, pD, poste, resgE, resgD, portal, trava, rampas, orbitas, chefe, faixas, bumpers, alvos, banco, muros, giro, retornos };
+  return { campo: C, baixo, pE, pD, poste, resgE, resgD, portal, trava, rampas, orbitas, chefe, faixas, bumpers, alvos, banco, muros, giro, retornos };
 }

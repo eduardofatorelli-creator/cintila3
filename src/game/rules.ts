@@ -1,9 +1,10 @@
 // As regras: pontuação, missões, chefe, multibola, modo mago, sobrevivência da bola.
 import { Bola, Campo, DT, G, novaBola } from '../core/physics';
 import { clamp, entre, rng, semear } from '../core/vec';
+import { ajustaPiso } from '../core/geometry';
 import type { MachineDef, TipoAndar } from '../machines/_schema';
 import { Mesa, montaMesa } from './machine';
-import { EVOLUCOES, Niveis, extraPalheta, proximaEvolucao, semEvolucoes } from './upgrades';
+import { EVOLUCOES, Niveis, extraPalheta, proximaEvolucao, recuoPivo, semEvolucoes } from './upgrades';
 import { SubFase, criaArena } from './arena';
 import { criaAndar } from './upper';
 import { ASSINATURAS, Sig } from './assinaturas';
@@ -252,6 +253,9 @@ export class Game implements Jogo {
   aplicaEvolucoes() {
     const M = this.m, n = this.evol;
     M.pE.extra = M.pD.extra = extraPalheta(n.palhetas);
+    const rec = recuoPivo(n.palhetas);
+    M.pE.px = M.pE.px0 - rec; M.pD.px = M.pD.px0 + rec;
+    ajustaPiso(M.baixo.pisoE, M.pE.px, 1); ajustaPiso(M.baixo.pisoD, M.pD.px, -1);
     const r = Math.max(2.5, [5.7, 6.8, 7.9][n.muros] - 0.5 * this.degrau); for (const p of M.muros) p.c.r = r;
     M.poste.tempoBaixo = [4, 3, 2][n.poste];
   }

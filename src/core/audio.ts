@@ -12,26 +12,38 @@ export class Audio {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = (window as any).AudioContext || (window as any).webkitAudioContext; if (!AC) return;
     const c: AudioContext = this.ctx = new AC();
-    const comp = c.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 5; comp.connect(c.destination);
-    this.sfx = c.createGain(); this.sfx.gain.value = 0.5; this.sfx.connect(comp);
-    this.mus = c.createGain(); this.mus.gain.value = 0.3; this.mus.connect(comp);
-    // reverberação: dois delays (71 ms e 113 ms) realimentados em 0,42 com passa-baixa em 2,6 kHz
-    this.rev = c.createGain(); this.rev.gain.value = 0.3;
-    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600; const saida = c.createGain(); saida.gain.value = 0.5; saida.connect(comp);
-    for (const t of [0.071, 0.113]) { const d = c.createDelay(0.5); d.delayTime.value = t; const fb = c.createGain(); fb.gain.value = 0.42; this.rev.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); d.connect(saida); }
+    const comp = c.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 5;
+    // limitador de segurança no mestre: nenhum defeito futuro pode estourar o alto-falante
+    const lim = c.createDynamicsCompressor();
+    lim.threshold.value = -3; lim.ratio.value = 20; lim.knee.value = 0; lim.attack.value = 0.002; lim.release.value = 0.12;
+    const mestre = c.createGain(); mestre.gain.value = 0.85;
+    comp.connect(lim); lim.connect(mestre); mestre.connect(c.destination);
+    this.sfx = c.createGain(); this.sfx.gain.value = 0.34; this.sfx.connect(comp);
+    this.mus = c.createGain(); this.mus.gain.value = 0.20; this.mus.connect(comp);
+    // reverberação: dois delays (71 ms e 113 ms), cada um com o SEU filtro. Um filtro compartilhado cruzava as
+    // realimentações e, com o Q padrão do biquad, o ganho do laço passava de 1: nascia um apito que crescia sozinho.
+    this.rev = c.createGain(); this.rev.gain.value = 0.16;
+    const saida = c.createGain(); saida.gain.value = 0.34; saida.connect(comp);
+    for (const t of [0.071, 0.113]) {
+      const d = c.createDelay(0.5); d.delayTime.value = t;
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2200; lp.Q.value = 0.707;
+      const fb = c.createGain(); fb.gain.value = 0.28;
+      this.rev.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); d.connect(saida);
+    }
     this.ruido = c.createBuffer(1, c.sampleRate, c.sampleRate); const dd = this.ruido.getChannelData(0); for (let i = 0; i < dd.length; i++) dd[i] = Math.random() * 2 - 1;
   }
   private tom(f: number, dur: number, tipo: Onda = 'square', vol = 0.3, o: { para?: number; em?: number; ataque?: number; dest?: GainNode; rev?: number } = {}) {
     const c = this.ctx; if (!c) return; const t = c.currentTime + (o.em || 0), os = c.createOscillator(), g = c.createGain();
     os.type = tipo; os.frequency.setValueAtTime(Math.max(20, f), t); if (o.para) os.frequency.exponentialRampToValueAtTime(Math.max(20, o.para), t + dur);
     g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + (o.ataque ?? 0.004)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    os.connect(g); g.connect(o.dest || this.sfx); if (o.rev !== 0) { const s = c.createGain(); s.gain.value = o.rev ?? 0.35; g.connect(s); s.connect(this.rev); }
+    os.connect(g); g.connect(o.dest || this.sfx); if (o.rev !== 0 && !o.dest) { const s = c.createGain(); s.gain.value = o.rev ?? 0.18; g.connect(s); s.connect(this.rev); }
     os.start(t); os.stop(t + dur + 0.03);
   }
   private chiado(dur: number, vol = 0.3, f = 2000, tipo: BiquadFilterType = 'bandpass', o: { para?: number; em?: number; dest?: GainNode; q?: number } = {}) {
     const c = this.ctx; if (!c) return; const t = c.currentTime + (o.em || 0), s = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain();
     s.buffer = this.ruido; s.loop = true; fl.type = tipo; fl.Q.value = o.q ?? 1; fl.frequency.setValueAtTime(f, t); if (o.para) fl.frequency.exponentialRampToValueAtTime(o.para, t + dur);
-    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); s.connect(fl); fl.connect(g); g.connect(o.dest || this.sfx); g.connect(this.rev);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); s.connect(fl); fl.connect(g); g.connect(o.dest || this.sfx);
+    if (!o.dest) { const env = c.createGain(); env.gain.value = 0.12; g.connect(env); env.connect(this.rev); }
     s.start(t, Math.random()); s.stop(t + dur + 0.03);
   }
   private nota(grau: number, oitava = 0) { const e = this.escala, n = e.length; return midi(this.raiz + 12 * (oitava + Math.floor(grau / n)) + e[((grau % n) + n) % n]); }
@@ -92,7 +104,7 @@ export class Audio {
     const s = p % 16, comp = Math.floor(p / 16), N = (g: number, o = 0) => this.nota(g, o), m = this.mus, n = this.nivel;
     const prog = this.progressao ? [0, 5, 3, 4] : [0, 0, 3, 4], fund = prog[comp % 4];
     // camada 1: bumbo e baixo
-    if (s % 4 === 0 || (n > 2 && s === 10)) { this.tom(120, 0.16, 'sine', 0.75, { para: 40, em, dest: m, rev: 0 }); }
+    if (s % 4 === 0 || (n > 2 && s === 10)) { this.tom(120, 0.16, 'sine', 0.42, { para: 40, em, dest: m, rev: 0 }); }
     if (s % 2 === 0) this.tom(N(fund + (s % 8 === 6 ? 2 : 0), -1), 0.16, 'sawtooth', 0.22, { em, dest: m, rev: 0.1 });
     // camada 2: caixa e chimbal
     if (n >= 2) { if (s === 4 || s === 12) this.chiado(0.13, 0.3, 1800, 'bandpass', { em, dest: m }); if (s % 2 === 1 || n > 3) this.chiado(0.03, 0.1, 8000, 'highpass', { em, dest: m }); }

@@ -61,8 +61,8 @@ export const ASSINATURAS: Record<string, Fab> = {
     return {
       nome: p.nome, info: () => 'ESCUDOS ' + g.vivos, medidor: () => 1 - g.vivos / 4,
       update() { g.x = ch.x; g.y = ch.y; ch.protegido = g.vivos > 0 && !ch.c.off; },
-      ev(t, b) {
-        if (t === 'escudoGira') { J.pontua(5000, b, 'assinatura'); J.som('escudo'); }
+      ev(t, b, d) {
+        if (t === 'escudoGira') { J.som('escudo'); if (d.quebrou) J.assinou(b, 8000, 'ESCUDO QUEBRADO'); else J.pontua(5000, b, 'assinatura'); }
         if (t === 'escudoGiraFim') { J.assinou(b, 40000, 'PORTÃO ABERTO'); g.volta = 14; }
         if (t === 'chefeVolta') g.renasce();
       },

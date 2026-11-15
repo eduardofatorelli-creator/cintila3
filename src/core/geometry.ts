@@ -10,7 +10,15 @@ export function arco(cx: number, cy: number, rx: number, ry: number, a0: number,
   return p;
 }
 
-export interface Baixo { guiaE: Seg; guiaD: Seg; estE: Seg; estD: Seg }
+/** Boca da canaleta externa: fim do guia de retorno e rebote das paredes vizinhas. Regulam o dreno lateral. */
+export const BOCA = { guiaX: 62, guiaY: 600, eGuia: 0.32, eCostas: 0.5 };
+
+export interface Baixo { guiaE: Seg; guiaD: Seg; estE: Seg; estD: Seg; pisoE: Seg[]; pisoD: Seg[] }
+
+/** O piso da entrada interna termina sobre o pivô da palheta; quando o pivô recua (Palhetas Longas), o piso acompanha. */
+export function ajustaPiso(piso: Seg[], px: number, lado: 1 | -1) {
+  const x = px + lado * 4; piso[0].bx = x; piso[1].ax = x; piso[1].bx = px;
+}
 
 /** A parte de baixo que resolveu o dreno lateral. Espelhada com x → 380 − x. */
 export function parteDeBaixo(c: Campo, cor: string): Baixo {
@@ -19,15 +27,15 @@ export function parteDeBaixo(c: Campo, cor: string): Baixo {
     const m = (x: number) => (lado ? espelha(x) : x), sufixo = lado ? 'D' : 'E';
     c.parede([[m(20), 430], [m(20), 572], [m(20), 700], [m(48), 756], [m(48), 800]], E_PAREDE, { cor });
     // guia de retorno: joga a bola descendo para dentro; de baixo para cima a bola passa (resgate)
-    const dx = m(62) - m(20), dy = 28, L = Math.hypot(dx, dy);
+    const dx = m(BOCA.guiaX) - m(20), dy = BOCA.guiaY - 572, L = Math.hypot(dx, dy);
     let nx = dy / L, ny = -dx / L; if (ny > 0) { nx = -nx; ny = -ny; }
-    r['guia' + sufixo] = c.parede([[m(20), 572], [m(62), 600]], 0.2, { cor, nx, ny })[0];
+    r['guia' + sufixo] = c.parede([[m(20), 572], [m(BOCA.guiaX), BOCA.guiaY]], BOCA.eGuia, { cor, nx, ny })[0];
     c.parede([[m(54), 630], [m(54), 700]], E_PAREDE, { cor });
     // piso da entrada interna: entrega em cima da palheta, um pouco além do pivô
-    c.parede([[m(54), 640], [m(128), 673], [m(124), 690]], E_ARCO, { cor });
+    r['piso' + sufixo] = c.parede([[m(54), 640], [m(128), 673], [m(124), 690]], E_ARCO, { cor });
     // estilingue: triângulo A B C, a face ativa A→C é registrada pela peça
-    // costas do estilingue amortecidas: a bola que vem do guia cai na entrada interna em vez de quicar para fora
-    c.parede([[m(86), 568], [m(86), 624]], 0.1, { cor }); c.parede([[m(86), 624], [m(128), 632]], E_BORRACHA, { cor });
+    // costas do estilingue: o rebote aqui é o que manda a bola errante para a canaleta externa (ver BOCA)
+    c.parede([[m(86), 568], [m(86), 624]], BOCA.eCostas, { cor }); c.parede([[m(86), 624], [m(128), 632]], E_BORRACHA, { cor });
     r['est' + sufixo] = seg(m(86), 568, m(128), 632, E_BORRACHA, { cor, tipo: 'estilingue' });
     c.segs.push(r['est' + sufixo]);
   }

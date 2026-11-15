@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 const url = process.argv[2] || 'https://cintila3.vercel.app';
 const b = await chromium.launch({ channel: 'chrome' });
 for (const [nome, vp] of [['desktop', { width: 1280, height: 800 }], ['celular', { width: 390, height: 844 }]]) {
-  const p = await b.newPage({ viewport: vp, hasTouch: nome === 'celular' });
+  const p = await b.newPage({ viewport: vp, hasTouch: nome === 'celular', isMobile: nome === 'celular' });
   const erros = []; p.on('pageerror', e => erros.push(String(e))); p.on('console', m => { if (m.type() === 'error') erros.push(m.text()); });
   await p.goto(url); await p.waitForSelector('.cartao', { timeout: 15000 });
   const cartoes = await p.locator('.cartao').count();

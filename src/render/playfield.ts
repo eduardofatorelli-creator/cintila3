@@ -11,7 +11,7 @@ export interface Vista { ox: number; oy: number; s: number }
 /** Implementa as ferramentas de desenho que as peças recebem. */
 export class Pintor implements Gfx {
   t = 0; ox = 0; oy = 0; s = 1; cam: Camera = CAM_MESA; camY = 0;
-  bloom: Ctx | null = null; bs = 0.5;
+  bloom: Ctx | null = null; bs = 0.5; semBrilho = false;
   constructor(public c: Ctx) {}
   mira(v: Vista, cam: Camera, camY = 0) { this.ox = v.ox; this.oy = v.oy; this.s = v.s; this.cam = cam; this.camY = camY; }
   p(x: number, y: number, z = 0): [number, number, number] { const q = proj(x, y - this.camY, z, this.cam); return [this.ox + q.sx * this.s, this.oy + q.sy * this.s, q.k * this.s]; }
@@ -40,6 +40,7 @@ export class Pintor implements Gfx {
   txt(x: number, y: number, s: string, cor: string, tam: number, z = 0) { const [X, Y, K] = this.p(x, y, z), c = this.c; c.font = `800 ${Math.max(5, tam * K)}px Orbitron, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = cor; c.fillText(s, X, Y); }
   glow(x: number, y: number, r: number, cor: string, z = 0, a = 1) {
     const [X, Y, K] = this.p(x, y, z), R = r * K;
+    if (this.semBrilho && r <= 64) return; // modo econômico: sem brilhos pequenos (eram o bloom)
     if (r > 64 || !this.bloom) { const c = this.c, g = c.createRadialGradient(X, Y, 0, X, Y, R); g.addColorStop(0, cor); g.addColorStop(1, 'rgba(0,0,0,0)'); c.globalAlpha = a * 0.5; c.globalCompositeOperation = 'lighter'; c.fillStyle = g; c.fillRect(X - R, Y - R, R * 2, R * 2); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; return; }
     const b = this.bloom; b.globalAlpha = Math.min(1, a); b.fillStyle = cor; b.beginPath(); b.arc(X * this.bs, Y * this.bs, R * this.bs, 0, TAU); b.fill(); b.globalAlpha = 1;
   }
@@ -83,6 +84,9 @@ function camadaBase(id: string, campo: Campo, tex: HTMLCanvasElement, v: Vista, 
   return b;
 }
 
+/** Pinta a camada parada da mesa num canvas qualquer (usado para montar o fundo pré-renderizado). */
+export function pintaBase(c: Ctx, id: string, campo: Campo, tex: HTMLCanvasElement, v: Vista, cam: Camera) { const b = camadaBase(id, campo, tex, v, cam); c.drawImage(b.tela, v.ox - b.mx, v.oy - b.my); }
+
 function palheta(g: Pintor, p: Palheta, c1: string, c2: string) {
   const c = g.c;
   for (const [z, cor, esc] of [[0, 'rgba(0,0,0,0.45)', 1], [5, c2, 1], [9, c1, 1], [9.5, '#ffffff', 0.35]] as [number, string, number][]) {
@@ -107,7 +111,8 @@ export function desenhaBola(g: Pintor, b: { x: number; y: number; z: number; r: 
   g.glow(b.x, b.y, b.r * 1.7, b.cor || cor, 7 + b.z, 0.55);
 }
 
-export interface OpcoesCampo { id: string; tex: HTMLCanvasElement; cores: { c1: string; c2: string; c3: string }; lancador?: number; passo?: number; semBase?: boolean }
+export const semEtapa: Record<string, boolean> = {};
+export interface OpcoesCampo { id: string; tex: HTMLCanvasElement; cores: { c1: string; c2: string; c3: string }; lancador?: number; passo?: number; semBase?: boolean; basePronta?: boolean }
 
 /** Desenha um campo inteiro: base parada, luzes, peças em ordem de pintor, palhetas e bolas. */
 export function desenhaCampo(g: Pintor, campo: Campo, v: Vista, cam: Camera, o: OpcoesCampo) {
@@ -120,11 +125,11 @@ export function desenhaCampo(g: Pintor, campo: Campo, v: Vista, cam: Camera, o: 
     for (let y = Math.floor(campo.camY / 80) * 80; y < campo.camY + H; y += 80) g.linha([[40, y, 0], [340, y, 0]], o.cores.c3, 2, 0.25);
     for (const s of campo.segs) if (!s.invisivel && !s.off && !s.dono && Math.max(s.ay, s.by) > campo.camY - 20 && Math.min(s.ay, s.by) < campo.camY + H + 20) g.muro(s.ax, Math.max(campo.camY - 10, s.ay), s.bx, Math.max(campo.camY - 10, s.by), 12, s.cor || '#889', 3);
   } else if (o.passo) { deforma(c, o.tex, v, cam, o.passo); paredes(g, campo, true); }
-  else { const b = camadaBase(o.id, campo, o.tex, v, cam); c.drawImage(b.tela, v.ox - b.mx, v.oy - b.my); }
+  else if (!semEtapa.base && !o.basePronta) { const b = camadaBase(o.id, campo, o.tex, v, cam); c.drawImage(b.tela, v.ox - b.mx, v.oy - b.my); }
   const visivel = (y: number) => y > campo.camY - 40 && y < campo.camY + H + 40;
-  for (const p of campo.pecas) if (p.luzes && visivel(p.y)) p.luzes(g);
+  if (!semEtapa.luzes) for (const p of campo.pecas) if (p.luzes && visivel(p.y)) p.luzes(g);
   const lista: { y: number; f: () => void }[] = [];
-  for (const p of campo.pecas) if (p.desenhar && visivel(p.y)) lista.push({ y: p.y, f: () => p.desenhar!(g) });
+  if (!semEtapa.pecas) for (const p of campo.pecas) if (p.desenhar && visivel(p.y)) lista.push({ y: p.y, f: () => p.desenhar!(g) });
   for (const p of campo.pas) lista.push({ y: p.py + 8, f: () => palheta(g, p, o.cores.c1, o.cores.c2) });
   for (const b of campo.bolas) lista.push({ y: b.y + (b.z > 2 ? 400 : 0), f: () => desenhaBola(g, b, o.cores.c1) });
   if (o.lancador !== undefined) lista.push({ y: 770, f: () => { const d = o.lancador! * 16; g.muro(368, 748 + d, 386, 748 + d, 6, '#c9cee6', 5); g.linha([[377, 752 + d, 3], [377, 790, 3]], '#8088aa', 3); } });

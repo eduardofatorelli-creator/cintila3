@@ -20,8 +20,15 @@ export function proximaEvolucao(n: Niveis): Evolucao | null {
   return livres[0] || null;
 }
 
-/** Comprimento extra da palheta: 3,5 u por nível, com teto que mantém o vão entre as pontas ≥ 14 u. */
-export function extraPalheta(nivel: number, base = 60, distPivos = 132, repouso = 0.5, raioPonta = 0): number {
-  const maxComp = (distPivos - 14 - raioPonta * 2) / 2 / Math.cos(repouso);
-  return Math.min(nivel * 3.5, Math.max(0, maxComp - base));
+/**
+ * Comprimento extra da palheta: 4 u por nível, SEM teto.
+ * O vão central não encolhe porque o pivô anda para fora junto (ver recuoPivo).
+ * O teto antigo garantia 14 u entre os CENTROS das pontas, mas a ponta tem raio 4,1 e a bola 7:
+ * a passagem real precisa de 2*4,1 + 2*7 = 22,2 u. Com 14 u a bola ficava presa nas duas pontas.
+ */
+export function extraPalheta(nivel: number): number { return nivel * 4; }
+
+/** Quanto cada pivô recua para fora, para o vão entre as pontas ficar constante. */
+export function recuoPivo(nivel: number, repouso = 0.5): number {
+  return extraPalheta(nivel) * Math.cos(repouso);
 }

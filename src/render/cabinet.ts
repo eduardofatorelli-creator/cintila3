@@ -7,19 +7,15 @@ type Ctx = CanvasRenderingContext2D;
 export interface Ret { x: number; y: number; w: number; h: number }
 export interface Quadro { w: number; h: number; paisagem: boolean; mesa: Vista; caixa: Ret; apron: Ret; painel: Ret | null; sacudir: Ret; celular: boolean }
 
-/** Divide a tela: backbox em cima (ou à direita em paisagem), mesa em perspectiva e apron. */
+/** Divide a tela, igual em celular e desktop: backbox em cima, mesa em perspectiva embaixo e apron. A mesa é sempre o maior elemento. */
 export function enquadra(w: number, h: number): Quadro {
-  const paisagem = w / h >= 1.2, celular = Math.min(w, h) < 560;
-  if (paisagem) {
-    const s = Math.min(h * 0.93 / H, w * 0.46 / W), mw = W * s, ox = Math.max(w * 0.04, w * 0.30 - mw / 2), oy = h * 0.03;
-    const bx = ox + mw + w * 0.04, bw = Math.min(w - bx - w * 0.03, h * 1.1), bh = Math.min(bw / 1.75, h * 0.5);
-    const apron = { x: ox, y: oy + H * s, w: mw, h: h - oy - H * s };
-    return { w, h, paisagem, celular, mesa: { ox, oy, s }, caixa: { x: bx, y: h * 0.05, w: bw, h: bh }, apron, painel: { x: bx, y: h * 0.05 + bh + h * 0.03, w: bw, h: h * 0.87 - bh }, sacudir: { x: bx + bw - 150, y: h - 64, w: 150, h: 44 } };
-  }
+  const celular = Math.min(w, h) < 560;
   const fb = celular ? 0.24 : 0.28, fm = celular ? 0.72 : 0.68, bh = h * fb, s = Math.min(h * fm / H, w * 0.98 / W), mw = W * s, ox = (w - mw) / 2, oy = bh;
   const bw = Math.min(w, Math.max(mw, bh * 1.9));
   const ah = h - bh - H * s;
-  return { w, h, paisagem, celular, mesa: { ox, oy, s }, caixa: { x: (w - bw) / 2, y: 0, w: bw, h: bh }, apron: { x: ox, y: oy + H * s, w: mw, h: ah }, painel: null, sacudir: { x: w / 2 - 54, y: h - Math.max(ah, 30), w: 108, h: Math.max(ah, 30) } };
+  // em tela larga sobra espaço ao lado da mesa: vai ali o painel de missões e controles, sem tirar área da mesa
+  const sobra = w - (ox + mw) - 40, painel = sobra >= 250 ? { x: ox + mw + 40, y: oy + H * s * 0.12, w: Math.min(sobra - 16, 430), h: H * s * 0.8 } : null;
+  return { w, h, paisagem: false, celular, mesa: { ox, oy, s }, caixa: { x: (w - bw) / 2, y: 0, w: bw, h: bh }, apron: { x: ox, y: oy + H * s, w: mw, h: ah }, painel, sacudir: { x: w / 2 - 54, y: h - Math.max(ah, 30), w: 108, h: Math.max(ah, 30) } };
 }
 
 export function desenhaGabinete(c: Ctx, q: Quadro, cores: { c1: string; c2: string; c3: string }, fundo: string[], lateral: HTMLCanvasElement | null, t: number) {

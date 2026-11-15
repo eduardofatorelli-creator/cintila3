@@ -14,7 +14,7 @@ import type { MachineDef } from './machines/_schema';
 import { Backbox, centroDmd, milhar, relogio, textoDmd } from './render/backbox';
 import { Quadro, desenhaBotoes, desenhaGabinete, enquadra, rr } from './render/cabinet';
 import { Efeitos } from './render/effects';
-import { Pintor, desenhaCampo, texturaSub } from './render/playfield';
+import { Pintor, desenhaCampo, pintaBase, semEtapa, texturaSub } from './render/playfield';
 import { Tema, novaTela } from './render/tema';
 import { Interface } from './ui';
 
@@ -23,13 +23,18 @@ const audio = new Audio(), efeitos = new Efeitos(), caixa = new Backbox(), pinto
 let prefs = salvo.prefs(); audio.som = prefs.som; audio.musica = prefs.musica; audio.narrador = prefs.narrador;
 let Q: Quadro = enquadra(innerWidth, innerHeight), dpr = 1;
 let J: Game | null = null, robo: Robo | null = null, def: MachineDef = MAQUINAS[0], modo: ModoJogo = 'normal';
+let fundoTela: HTMLCanvasElement | null = null, fundoChave = '';
 let texMesa: HTMLCanvasElement | null = null, texSub: HTMLCanvasElement | null = null, subDe: unknown = null;
 let estado: 'menu' | 'jogo' | 'pausa' | 'fim' | 'atracao' = 'menu';
 let qualidade = 0, lento = 0, folga = 0;
+const sem: Record<string, boolean> = {}; // desliga etapas do desenho, só para medir (ganchos de teste)
+const toque = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) <= 6;
 let acum = 0, ultimo = 0, tempo = 0, rodando = true, parado = 0, liberou = 0, primeiraBola = true;
 
 function ajusta() {
-  dpr = Math.min(qualidade >= 3 ? 1 : qualidade >= 2 ? 1.5 : 2, devicePixelRatio || 1); tela.width = Math.round(innerWidth * dpr); tela.height = Math.round(innerHeight * dpr);
+  // aparelho de toque já entra no degrau econômico: dpr 1 e bloom sem desfoque. O gargalo lá é rasterização.
+  if (toque && qualidade === 0) { qualidade = 2; efeitos.max = 110; efeitos.simples = true; efeitos.semBloom = true; }
+  dpr = Math.min(toque ? 1 : (qualidade >= 3 ? 1 : qualidade >= 2 ? 1.5 : 2), devicePixelRatio || 1); tela.width = Math.round(innerWidth * dpr); tela.height = Math.round(innerHeight * dpr);
   Q = enquadra(innerWidth, innerHeight);
 }
 addEventListener('resize', ajusta); ajusta();
@@ -37,7 +42,7 @@ addEventListener('resize', ajusta); ajusta();
 function carrega(d: MachineDef, m: ModoJogo, atracao = false) {
   def = d; modo = m;
   const [t, tc] = novaTela(W, H, 2); d.arte(tc, new Tema(tc, d.paleta, W, H)); texMesa = t;
-  caixa.carrega(d);
+  caixa.carrega(d); fundoChave = '';
   J = new Game(d, m, atracao ? 0 : salvo.mestria(d.id), (Date.now() % 100000) + 1);
   (J as any).ranking = salvo.ranking(d.id);
   J.saidaSom = atracao ? null : (n, p) => audio.toca(n, p); J.saidaFala = atracao ? null : s => audio.fala(s);
@@ -94,8 +99,7 @@ function desenha() {
   const w = innerWidth, h = innerHeight; pintor.t = tempo;
   if (!J || !texMesa) { c.fillStyle = '#05060f'; c.fillRect(0, 0, w, h); return; }
   const k = J.cores, v = Q.mesa, T = J.trans, S = J.sub;
-  desenhaGabinete(c, Q, k, def.paleta.fundo, caixa.camadas[0] || null, tempo);
-  pintor.bloom = efeitos.preparaBloom(w, h);
+  pintor.bloom = efeitos.semBloom ? null : efeitos.preparaBloom(w, h); pintor.semBrilho = efeitos.semBloom;
   // presença do campo de cima: d = quanto desceu, cm = quanto a câmera já subiu
   let d = 0, cm = 0;
   if (S) {
@@ -106,8 +110,18 @@ function desenha() {
     }
   }
   const tr = J.tremor * 5, tx = tr ? (Math.random() - 0.5) * tr : 0, ty = tr ? (Math.random() - 0.5) * tr : 0;
-  const vm = { ox: v.ox + tx, oy: v.oy + ty + cm * 26 * v.s, s: v.s };
-  desenhaCampo(pintor, J.mesa, vm, CAM_MESA, { id: 'mesa:' + def.id, tex: texMesa, cores: k, lancador: J.carregando ? J.carga : 0 });
+  // fundo parado (gabinete + tablado + backglass): pintado uma vez por máquina e por tamanho de tela, depois é só uma cópia por quadro
+  const chave = def.id + '|' + tela.width + 'x' + tela.height;
+  if (!fundoTela || fundoChave !== chave) {
+    const [ft, fc] = novaTela(w, h, dpr); desenhaGabinete(fc, Q, k, def.paleta.fundo, caixa.camadas[0] || null, 0);
+    pintaBase(fc, 'mesa:' + def.id, J.mesa, texMesa, v, CAM_MESA); caixa.desenha(fc, Q.caixa, null, 0);
+    fundoTela = ft; fundoChave = chave;
+  }
+  c.setTransform(1, 0, 0, 1, 0, 0); if (tr) { c.fillStyle = '#03040b'; c.fillRect(0, 0, tela.width, tela.height); }
+  if (!sem.fundo) c.drawImage(fundoTela, Math.round(tx * dpr), Math.round(ty * dpr)); else { c.fillStyle = '#03040b'; c.fillRect(0, 0, tela.width, tela.height); }
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const vm = { ox: v.ox + tx, oy: v.oy + ty, s: v.s };
+  if (!sem.mesa) desenhaCampo(pintor, J.mesa, vm, CAM_MESA, { id: 'mesa:' + def.id, tex: texMesa, cores: k, lancador: J.carregando ? J.carga : 0, basePronta: true });
   if (!S || T) efeitos.desenha(pintor);
   // luz de ambiente por modo
   const amb = J.mago ? `rgba(255,255,255,${0.05 + Math.sin(tempo * 8) * 0.04})` : J.multibola ? 'rgba(255,200,60,0.09)' : J.m.chefe.vida === 1 && !J.m.chefe.c.off ? `rgba(255,30,60,${0.06 + Math.sin(tempo * 5) * 0.03})` : '';
@@ -123,9 +137,9 @@ function desenha() {
     desenhaCampo(pintor, S.campo, vs, cam, { id: 'sub', tex: texSub!, cores: k, passo: cm > 0 && cm < 1 ? 8 : 0, semBase: S.rolagem });
     if (!T) efeitos.desenha(pintor);
   }
-  efeitos.compoeBloom(c, w, h);
+  if (!efeitos.semBloom) efeitos.compoeBloom(c, w, h);
   const b0 = J.campo.bolas[0];
-  caixa.desenha(c, Q.caixa, estado === 'atracao' ? null : J, tempo, b0 ? clamp(b0.x / W, 0, 1) : 0.5, b0 ? clamp((b0.y - J.campo.camY) / H, 0, 1) : 0.5, atracaoDmd);
+  if (!sem.caixa) caixa.desenha(c, Q.caixa, estado === 'atracao' ? null : J, tempo, b0 ? clamp(b0.x / W, 0, 1) : 0.5, b0 ? clamp((b0.y - J.campo.camY) / H, 0, 1) : 0.5, atracaoDmd, efeitos.semBloom);
   if (Q.painel) lateral(Q.painel);
   if (estado !== 'atracao') desenhaBotoes(c, Q, k, J.carregando ? J.carga : 0, !!J.bolaNaCanaleta() && !S, tempo, primeiraBola && J.estado === 'lancar' && !J.escolha);
   if (J.escolha) cartas();
@@ -174,7 +188,7 @@ function cartas() {
 function quadro(agora: number) {
   const dt = Math.min(0.05, (agora - ultimo) / 1000 || 0); ultimo = agora;
   // qualidade adaptativa: se o quadro passa de 20 ms por um tempo, corta partículas, depois bloom e resolução
-  if (estado === 'jogo' || estado === 'atracao') { if (dt > 0.021) lento += dt; else { lento = Math.max(0, lento - dt * 0.5); folga += dt; } if (lento > 1.5 && qualidade < 3) { qualidade++; lento = 0; folga = 0; efeitos.max = [300, 110, 60, 40][qualidade]; efeitos.simples = qualidade >= 2; ajusta(); } }
+  if (estado === 'jogo' || estado === 'atracao') { if (dt > 0.021) lento += dt; else { lento = Math.max(0, lento - dt * 0.5); folga += dt; } if (lento > 1.5 && qualidade < 3) { qualidade++; lento = 0; folga = 0; efeitos.max = [300, 110, 60, 40][qualidade]; efeitos.simples = qualidade >= 2; if (qualidade >= 3) efeitos.semBloom = true; ajusta(); } }
   if (rodando) { passo(dt); desenha(); requestAnimationFrame(quadro); }
 }
 
@@ -186,7 +200,7 @@ Promise.race([Promise.all([fontes?.load('8px "Press Start 2P"'), fontes?.load('8
 // ganchos de teste (seção 12.1)
 if (import.meta.env.DEV) {
   (window as any).__cintila = {
-    get jogo() { return J; }, efeitos, caixa, get bolas() { return J?.campo.bolas || []; }, get palhetas() { return J?.campo.pas || []; }, get estado() { return estado; },
+    get jogo() { return J; }, efeitos, caixa, sem, semEtapa, get bolas() { return J?.campo.bolas || []; }, get palhetas() { return J?.campo.pas || []; }, get estado() { return estado; },
     setFlip: (i: 0 | 1, on: boolean) => J?.setFlip(i, on),
     step: (dt = DT) => { J?.update(dt); },
     stopLoop: () => { rodando = false; },
