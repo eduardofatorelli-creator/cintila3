@@ -40,11 +40,11 @@ export class Pintor implements Gfx {
     // corpo com sombreamento cilíndrico (gradiente em cache) e saia metálica na base
     c.save(); c.translate(X0, 0);
     c.fillStyle = this.corpo(cor, R); c.beginPath(); c.arc(0, Y0, R, 0, Math.PI); c.lineTo(-R, Y1); c.arc(0, Y1, R, Math.PI, 0, true); c.closePath(); c.fill();
-    if (z > 6 && R > 3) { c.strokeStyle = M.metal[1]; c.globalAlpha = 0.55; c.lineWidth = Math.max(0.6, R * 0.09); c.beginPath(); c.arc(0, Y0 - (Y0 - Y1) * 0.22, R, 0.05, Math.PI - 0.05); c.stroke(); c.globalAlpha = 1; }
+    if (z > 6 && R > 3 && !this.semBrilho) { c.strokeStyle = M.metal[1]; c.globalAlpha = 0.55; c.lineWidth = Math.max(0.6, R * 0.09); c.beginPath(); c.arc(0, Y0 - (Y0 - Y1) * 0.22, R, 0.05, Math.PI - 0.05); c.stroke(); c.globalAlpha = 1; }
     // tampa: domo, anel, facetado, vidro ou disco, conforme o material da máquina
     const tp = topo || cor; c.translate(0, Y1); c.fillStyle = this.tampa(tp, R); c.beginPath(); c.arc(0, 0, R, 0, TAU); c.fill();
     c.lineWidth = Math.max(0.6, R * 0.12); c.strokeStyle = M.metal[2]; c.globalAlpha = 0.5; c.beginPath(); c.arc(0, 0, R * 0.93, 0, TAU); c.stroke();
-    if (R > 5) {
+    if (R > 5 && !this.semBrilho) {
       if (M.tampa === 'anel') { c.globalAlpha = 0.8; c.strokeStyle = M.metal[1]; c.beginPath(); c.arc(0, 0, R * 0.62, 0, TAU); c.stroke(); }
       else if (M.tampa === 'facetado') { c.globalAlpha = 0.3; c.strokeStyle = '#ffffff'; c.lineWidth = Math.max(0.5, R * 0.05); c.beginPath(); for (let i = 0; i < 6; i++) { const q = i / 6 * TAU; c.moveTo(0, 0); c.lineTo(Math.cos(q) * R * 0.9, Math.sin(q) * R * 0.9); } c.stroke(); }
       else if (M.tampa === 'vidro') { c.globalAlpha = 0.35; c.fillStyle = '#ffffff'; c.beginPath(); c.ellipse(-R * 0.15, -R * 0.1, R * 0.62, R * 0.4, -0.5, 0, TAU); c.fill(); }
@@ -78,13 +78,20 @@ export class Pintor implements Gfx {
   }
   luz(x: number, y: number, r: number, cor: string, on: number, rot?: string) {
     const [X, Y, K] = this.p(x, y, 0), c = this.c, R = r * K;
+    // modo econômico (toque): só a lente na forma da máquina e o núcleo, sem moldura nem reflexo
+    if (this.semBrilho) {
+      c.save(); c.translate(X, Y); c.scale(1, 0.88); c.globalAlpha = Math.min(1, 0.16 + on * 0.84); c.fillStyle = cor; formaInsert(c, this.insert, R); c.fill();
+      if (on > 0.5) { c.globalAlpha = 0.75; c.fillStyle = '#ffffff'; formaInsert(c, this.insert, R * 0.42); c.fill(); } c.restore();
+      if (rot && K > 0.55) { c.font = `800 ${Math.max(5, 5.2 * K)}px Orbitron, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'top'; c.fillStyle = on > 0.5 ? '#ffffff' : 'rgba(255,255,255,0.45)'; c.fillText(rot, X, Y + R * 1.3); }
+      return;
+    }
     // inserto: moldura escura, lente na forma da máquina, núcleo branco quando aceso
     c.save(); c.translate(X, Y); c.scale(1, 0.88);
     c.fillStyle = '#04050b'; formaInsert(c, this.insert, R * 1.22); c.fill();
-    c.strokeStyle = this.mat.metal[1]; c.globalAlpha = 0.35; c.lineWidth = Math.max(0.5, R * 0.1); c.stroke();
+    if (!this.semBrilho) { c.strokeStyle = this.mat.metal[1]; c.globalAlpha = 0.35; c.lineWidth = Math.max(0.5, R * 0.1); c.stroke(); }
     c.globalAlpha = Math.min(1, 0.14 + on * 0.86); c.fillStyle = on > 0.5 ? this.tampa(cor, R) : cor; formaInsert(c, this.insert, R); c.fill();
     if (on > 0.5) { c.globalAlpha = 0.75; c.fillStyle = '#ffffff'; formaInsert(c, this.insert, R * 0.42); c.fill(); }
-    else { c.globalAlpha = 0.22; c.fillStyle = '#ffffff'; c.beginPath(); c.ellipse(-R * 0.25, -R * 0.35, R * 0.4, R * 0.18, 0, 0, TAU); c.fill(); }
+    else if (!this.semBrilho) { c.globalAlpha = 0.22; c.fillStyle = '#ffffff'; c.beginPath(); c.ellipse(-R * 0.25, -R * 0.35, R * 0.4, R * 0.18, 0, 0, TAU); c.fill(); }
     c.restore();
     if (on > 0.5) this.glow(x, y, r * 1.9, cor, 0, on * 0.9);
     if (rot && K > 0.55) { c.font = `800 ${Math.max(5, 5.2 * K)}px Orbitron, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'top'; c.fillStyle = on > 0.5 ? '#ffffff' : 'rgba(255,255,255,0.45)'; c.fillText(rot, X, Y + R * 1.3); }
@@ -163,6 +170,8 @@ export function desenhaBola(g: Pintor, b: { x: number; y: number; z: number; r: 
   const [sx, sy, sk] = g.p(b.x, b.y + 2, 0);
   c.fillStyle = 'rgba(0,0,0,0.6)'; c.beginPath(); c.ellipse(sx, sy, b.r * sk * (1 + b.z * 0.01), b.r * sk * 0.45, 0, 0, TAU); c.fill();
   const [X, Y, K] = g.p(b.x, b.y, 7 + b.z), R = b.r * K;
+  // halo escuro curto: separa a bola de qualquer arte clara por trás
+  const hl = c.createRadialGradient(X, Y, R * 0.9, X, Y, R * 2.1); hl.addColorStop(0, 'rgba(0,0,8,0.45)'); hl.addColorStop(1, 'rgba(0,0,8,0)'); c.fillStyle = hl; c.beginPath(); c.arc(X, Y, R * 2.1, 0, TAU); c.fill();
   // aço cromado: reflexo da luz da máquina embaixo, contorno escuro para ler sobre arte clara
   const gr = c.createRadialGradient(X - R * 0.35, Y - R * 0.4, R * 0.08, X, Y, R);
   if (b.cor) { gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.45, b.cor); gr.addColorStop(1, '#111'); }

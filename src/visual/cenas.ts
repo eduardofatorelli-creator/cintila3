@@ -217,8 +217,10 @@ export const CENAS: Record<string, Cena> = {
   },
 
   'zero-g'(p, m) {
-    p.ceu([[0, '#04040c'], [0.5, '#101a3a'], [1, '#05060f']]);
+    p.ceu([[0, '#06061a'], [0.5, '#14245a'], [1, '#070a1e']]);
     p.semente(131).estrelas(200, '#ffffff', 0, 760);
+    p.nevoa(90, 140, 140, 90, p.p.c2, 0.25, 'lighter'); p.nevoa(300, 300, 160, 110, p.p.c3, 0.2, 'lighter');
+    for (let i = 0; i < 26; i++) { const y = p.rr(60, 520); p.curva([[0, y], [400, y + p.rr(-30, 30)]], [p.p.c1, p.p.c2, p.p.c3][i % 3], p.rr(0.6, 1.6), 0.12); }
     // planeta e anel de corrida inclinado em volta do chefe
     p.nevoa(330, 620, 140, 140, p.p.c3, 0.3, 'lighter'); p.disco(330, 620, 90, '#0e2550'); p.listras(240, 590, 180, 8, 1, '#1a3a70', '#1a3a70', 0.5);
     const [cx, cy] = [m.chefe.x, m.chefe.y];
@@ -294,7 +296,7 @@ export const CENAS: Record<string, Cena> = {
     for (let i = 0; i < 16; i++) p.forma([[200, -60], [i * 27 - 16, 420], [(i + 1) * 27 - 16, 420]], i % 2 ? '#5c0f22' : '#e9e2d0', i % 2 ? 0.85 : 0.18);
     p.lampadas(p.arcoPts(200, 420, 230, Math.PI * 1.08, Math.PI * 1.92, 20), p.p.c1, 2.2, 0.7);
     // picadeiro com alvo pintado sob o canhão (assinatura)
-    p.nevoa(200, 560, 170, 70, '#3a1608', 0.8); p.aneis(200, 560, 150, 2, p.p.c1, 0.55, 3);
+    p.nevoa(200, 590, 180, 80, '#5a2a10', 0.7); p.nevoa(200, 590, 120, 50, '#c99a5a', 0.12, 'lighter');
     const cn = acha(m, 'canhao')[0] || { x: 190, y: 456 };
     p.aneis(cn.x, cn.y, 34, 4, p.p.c2, 0.4, 3); p.disco(cn.x, cn.y, 6, p.p.c2, 0.6);
     p.feixe(30, 0, 1.15, 0.12, 620, '#fff3c0', 0.18); p.feixe(370, 0, 1.99, 0.12, 620, '#fff3c0', 0.18);
@@ -317,12 +319,12 @@ export const CENAS: Record<string, Cena> = {
   },
 
   deserto(p, m) {
-    p.ceu([[0, '#2a1606'], [0.25, '#5a3a14'], [0.6, '#8a5a24'], [1, '#2a1a08']]);
+    p.ceu([[0, '#1e1004'], [0.25, '#4a2e10'], [0.6, '#5e3c16'], [1, '#1e1206']]);
     // sol dramático e raios
-    p.nevoa(200, 90, 160, 120, '#ffe9a8', 0.5, 'lighter'); p.disco(200, 90, 40, '#fff1c8', 0.9); p.raios(200, 90, 420, 20, '#ffe9a8', 0.07, 0.4);
+    p.nevoa(200, 70, 140, 90, '#ffe9a8', 0.35, 'lighter'); p.disco(200, 70, 34, '#fff1c8', 0.85); p.raios(200, 70, 420, 20, '#ffe9a8', 0.05, 0.4);
     // ruínas douradas e dunas
     p.colunas(330, 5, 110, '#6a4518', 0.5);
-    p.dunas(360, 6, '#7a4e1c', '#5a3812', 0.9);
+    p.dunas(360, 6, '#5e3a14', '#46290c', 0.9);
     // redemoinho de areia no poço (assinatura)
     const po = acha(m, 'pocoDeAreia')[0] || { x: 190, y: 456 };
     p.espiral(po.x, po.y, 54, 3, '#ffe9a8', 2, 0.4); p.nevoa(po.x, po.y, 40, 40, '#2a1206', 0.5);

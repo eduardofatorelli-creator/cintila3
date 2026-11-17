@@ -9,6 +9,7 @@ for (const taxa of [1, 4, 6]) {
   const ctx = await b.newContext({ viewport: { width: 412, height: 915 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   const p = await ctx.newPage(); const cdp = await ctx.newCDPSession(p);
   await p.goto(url); await p.waitForSelector('.cartao'); await p.getByText('▶ JOGAR').tap(); await p.waitForTimeout(800);
+  if (process.env.SEM_ETAPAS) await p.evaluate(l => { for (const k of l.split(',')) { window.__cintila.sem[k] = true; window.__cintila.semEtapa[k] = true; } }, process.env.SEM_ETAPAS);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: taxa });
   // lança a bola e joga: toques alternados nas duas metades enquanto mede o intervalo entre quadros
   await p.touchscreen.tap(330, 600); await p.keyboard.down('Space'); await p.waitForTimeout(700); await p.keyboard.up('Space');

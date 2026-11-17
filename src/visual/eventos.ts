@@ -10,7 +10,9 @@ interface Pt { x: number; y: number; z: number; vx: number; vy: number; vz: numb
 
 export class EfeitosVisuais {
   private fx: Fx[] = []; private ps: Pt[] = []; maxPs = 70; reduzido = false;
-  constructor(public choque: Choque, public particula: Particula, public cores: { c1: string; c2: string; c3: string }) {}
+  /** peças da mesa (só leitura), para os efeitos que ligam uma peça à outra */
+  pecas: () => any[] = () => [];
+  constructor(public choque: Choque, public particula: Particula, public cores: { c1: string; c2: string; c3: string }, public sig = '') {}
   limpa() { this.fx.length = 0; this.ps.length = 0; }
   private soma(f: Fx) { if (this.fx.length > 24) this.fx.shift(); this.fx.push(f); }
   private solta(x: number, y: number, n: number, cor: string, forca = 1) {
@@ -26,13 +28,23 @@ export class EfeitosVisuais {
     switch (tipo) {
       case 'bumper': if (d && typeof d.x === 'number') { this.soma({ tipo: 'choque', x: d.x, y: d.y, t: 0, dur: 0.42, cor: K.c1, r: (d.r || 16) }); this.solta(d.x, d.y, 4, K.c1); } break;
       case 'sling': if (d?.s) this.soma({ tipo: 'corte', x: 0, y: 0, t: 0, dur: 0.22, cor: '#ffffff', r: 0, d: d.s }); break;
-      case 'alvo': case 'queda': this.soma({ tipo: 'alvo', x, y, t: 0, dur: 0.3, cor: K.c3, r: 10 }); this.solta(x, y, 3, K.c3, 0.8); break;
+      case 'alvo': case 'queda': {
+        this.soma({ tipo: 'alvo', x, y, t: 0, dur: 0.3, cor: K.c3, r: 10 }); this.solta(x, y, 3, K.c3, 0.8);
+        // Aurora (e a máquina final, se sortear): o alvo acertado manda um traço de luz para a próxima estrela da constelação
+        if (tipo === 'alvo' && d?.rotulo && /^\d+$/.test(d.rotulo)) { const prox = this.pecas().find(q => q.tipo === 'alvoFixo' && q.aceso === false && q.vale === 1); if (prox && prox !== d) this.soma({ tipo: 'cometa', x, y, t: 0, dur: 0.75, cor: K.c1, r: 0, d: [[d.x, d.y, 6], [(d.x + prox.x) / 2, (d.y + prox.y) / 2, 30], [prox.x, prox.y, 6]] }); }
+        break;
+      }
       case 'rampa': if (d?.caminho) this.soma({ tipo: 'cometa', x, y, t: 0, dur: 0.9, cor: K.c1, r: 0, d: d.caminho }); break;
       case 'orbita': if (d && typeof d.x === 'number') this.soma({ tipo: 'cometa', x, y, t: 0, dur: 0.7, cor: K.c3, r: 0, d: [[d.x, 470, 2], [d.x, 300, 2], [d.x, 140, 2]] }); break;
       case 'chefe': { const c = chefe || { x, y }; this.soma({ tipo: 'chefe', x: c.x, y: c.y, t: 0, dur: 0.55, cor: '#ff4466', r: 26 }); this.solta(c.x, c.y, 6, '#ff7a90', 1.2); break; }
       case 'portal': case 'trava': case 'tunel': case 'boca': case 'poco': case 'flor': case 'prisma': case 'roda': case 'elevadorEntra':
         this.soma({ tipo: 'gira', x: d?.x ?? x, y: d?.y ?? y, t: 0, dur: 0.6, cor: K.c2, r: 18 }); break;
-      case 'cano': case 'pocoCospe': case 'disparo': case 'pouso': case 'giratorio': case 'escudoGira':
+      case 'cano': if (d?.peca?.canos) { const p0 = d.peca, cn = p0.canos[d.i]; this.soma({ tipo: 'cometa', x, y, t: 0, dur: 0.7, cor: K.c1, r: 0, d: [[p0.x, p0.y, 2], [(p0.x + cn[0]) / 2, (p0.y + cn[1]) / 2, 2], [cn[0], cn[1], 2]] }); this.solta(cn[0], cn[1], 7, '#bff8ff', 0.7); }
+        this.soma({ tipo: 'choque', x, y, t: 0, dur: 0.5, cor: K.c2, r: 14 }); break;
+      case 'giratorio': if (d?.peca?.trilho) { const tr = d.peca.trilho as number[][]; this.soma({ tipo: 'cometa', x, y, t: 0, dur: 0.6, cor: K.c2, r: 0, d: tr.map(q => [q[0], q[1], 2]) }); this.soma({ tipo: 'choque', x: d.x, y: d.y, t: 0, dur: 0.5, cor: K.c3, r: 16 }); this.solta(d.x, d.y, 10, K.c1, 1.2); break; }
+        this.soma({ tipo: 'choque', x, y, t: 0, dur: 0.5, cor: K.c2, r: 14 }); this.solta(x, y, 8, K.c2, 1.1); break;
+      case 'pas': if (d && typeof d.x === 'number') { this.soma({ tipo: 'choque', x: d.x, y: d.y, t: 0, dur: 0.4, cor: K.c3, r: 20 }); this.solta(x, y, 4, K.c1); } break;
+      case 'pocoCospe': case 'disparo': case 'pouso': case 'escudoGira':
         this.soma({ tipo: 'choque', x, y, t: 0, dur: 0.5, cor: K.c2, r: 14 }); this.solta(x, y, 8, K.c2, 1.1); break;
       case 'banco': this.soma({ tipo: 'choque', x, y, t: 0, dur: 0.6, cor: K.c3, r: 30 }); this.solta(x, y, 10, K.c3, 1.2); break;
       default: break;

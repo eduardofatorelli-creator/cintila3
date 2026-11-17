@@ -11,6 +11,8 @@ export class Ambiente {
   private ps: Pt[] = []; private t = 0; private raio = 0; private raioPts: number[][] = [];
   /** 1 normal, 2 no modo mago; 0,5 em modo econômico */
   forca = 1; reduzido = false;
+  /** modo econômico: sem as faixas e feixes de área grande (o gargalo em celular é preencher pixels) */
+  leve = false;
   constructor(public tipo: Tipo, public cores: { c1: string; c2: string; c3: string }, n = 28) {
     for (let i = 0; i < n; i++) this.ps.push(this.novo(true));
   }
@@ -39,14 +41,14 @@ export class Ambiente {
   desenha(g: Pintor) {
     const c = g.c, T = this.tipo, K = this.cores, n = Math.round(this.ps.length * Math.min(1, this.forca)), a0 = 0.5 * Math.min(1.4, this.forca);
     c.save(); c.globalCompositeOperation = 'lighter';
-    if (T === 'aurora') {
+    if (T === 'aurora' && !this.leve) {
       // três faixas lentas de aurora no alto da mesa
       for (let k = 0; k < 3; k++) {
         c.beginPath(); for (let x = 20; x <= 380; x += 30) { const [X, Y] = g.p(x, 70 + k * 34 + Math.sin(x * 0.02 + this.t * 0.6 + k * 2) * 16); c.lineTo(X, Y); }
         c.strokeStyle = alfa([K.c1, '#7dffb0', K.c3][k], 0.08 * a0 * 2); c.lineWidth = 22 * g.s; c.lineCap = 'round'; c.stroke();
       }
     }
-    if (T === 'feixes' || T === 'prisma') {
+    if ((T === 'feixes' || T === 'prisma') && !this.leve) {
       for (let k = 0; k < 2; k++) {
         const q = Math.PI / 2 + Math.sin(this.t * 0.5 + k * 2.5) * 0.6, [X, Y] = g.p(k ? 360 : 40, 20), L = 700 * g.s;
         const gr = c.createRadialGradient(X, Y, 0, X, Y, L); gr.addColorStop(0, alfa(k ? K.c2 : K.c1, 0.12 * a0)); gr.addColorStop(1, alfa(K.c1, 0));

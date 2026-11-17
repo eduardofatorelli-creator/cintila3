@@ -55,7 +55,7 @@ function carrega(d: MachineDef, m: ModoJogo, atracao = false) {
   // tablado autoral da máquina (cena + acabamento), lendo as posições reais das peças já montadas
   texMesa = texturaMesa(d, J); subDe = null; aplicaVisual(pintor, d.id);
   const vis = visualDe(d.id); ambiente = new Ambiente(vis.ambiente, d.paleta, toque ? 18 : 30); ambiente.reduzido = reduz;
-  fxv = new EfeitosVisuais(vis.choque, vis.particula, d.paleta); fxv.reduzido = reduz; fxv.maxPs = toque ? 40 : 70; miniCarta = null;
+  fxv = new EfeitosVisuais(vis.choque, vis.particula, d.paleta, d.assinatura.tipo); fxv.pecas = () => J?.mesa.pecas || []; fxv.reduzido = reduz; fxv.maxPs = toque ? 40 : 70; miniCarta = null;
   { const ev0 = J.ev.bind(J), Jv = J, fx = fxv; Jv.ev = (tp, b, dd) => { ev0(tp, b, dd); try { fx.observa(tp, b, dd, Jv.m.chefe); } catch { /* a apresentação nunca derruba o jogo */ } }; }
   (J as any).ranking = salvo.ranking(d.id);
   J.saidaSom = atracao ? null : (n, p) => audio.toca(n, p); J.saidaFala = atracao ? null : s => audio.fala(s);
@@ -82,7 +82,7 @@ ligaEntrada(tela, {
   flip: (l, on) => J?.setFlip(l, on),
   lanca: on => { if (!J) return; if (J.escolha) { if (on) J.escolher(J.escolha.i); return; } if (on) { J.carregando = true; J.carga = 0; } else if (J.carregando) { J.carregando = false; J.lancar(J.carga); primeiraBola = false; } },
   sacode: d => { if (J?.escolha) J.escolher(J.escolha.i); else J?.sacudir(d); },
-  pausa: () => { if (estado === 'jogo') { estado = 'pausa'; ui.pausa(J!); } else if (estado === 'pausa') { estado = 'jogo'; ui.fecha(); } },
+  pausa: () => { if (estado === 'jogo' && J) { estado = 'pausa'; ui.pausa(J); } else if (estado === 'pausa') { estado = 'jogo'; ui.fecha(); } },
   confirma: () => { if (J?.escolha) J.escolher(J.escolha.i); },
   zonaSacudir: () => Q.sacudir, podeLancar: () => !!J && !!J.bolaNaCanaleta() && !J.sub,
   ativo: () => estado === 'jogo',
@@ -95,7 +95,7 @@ tela.addEventListener('pointerdown', e => {
   const n = E.opcoes.length, cw = Math.min(150, (Q.mesa.s * W - 20) / n), x0 = Q.mesa.ox + Q.mesa.s * W / 2 - cw * n / 2, y0 = Q.mesa.oy + Q.mesa.s * H * 0.34;
   const i = Math.floor((e.clientX - x0) / cw); if (i >= 0 && i < n && e.clientY > y0 && e.clientY < y0 + cw * 1.5) { J!.escolher(i); e.stopImmediatePropagation(); }
 }, true);
-document.addEventListener('visibilitychange', () => { if (document.hidden && estado === 'jogo') { estado = 'pausa'; ui.pausa(J!); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden && estado === 'jogo' && J) { estado = 'pausa'; ui.pausa(J); } });
 
 function passo(dt: number) {
   tempo += dt;
@@ -105,7 +105,7 @@ function passo(dt: number) {
   while (acum >= DT) { robo?.passo(DT); J.update(DT); acum -= DT; }
   if (estado === 'atracao' && J.estado === 'fim') { estado = 'menu'; J = null; ui.menu(); return; }
   efeitos.recebe(J.fxs); efeitos.passo(dt); apres.observa(J.anuncios, J.cores); caixa.recebe(J.anuncios); caixa.passo(dt);
-  apres.passo(dt); fxv?.passo(dt); if (ambiente) { ambiente.forca = (J.mago ? 2 : J.multibola ? 1.4 : 1) * (qualidade >= 2 ? 0.6 : 1); ambiente.passo(dt); }
+  apres.passo(dt); fxv?.passo(dt); if (ambiente) { ambiente.forca = (J.mago ? 2 : J.multibola ? 1.4 : 1) * (qualidade >= 2 ? 0.6 : 1); ambiente.leve = qualidade >= 2; ambiente.passo(dt); }
   audio.nivel = J.mago ? 4 : J.multibola ? 3 : J.intensidade > 0.3 || J.sub ? 2 : 1; audio.progressao = J.sub ? 1 : 0;
 }
 
@@ -152,12 +152,11 @@ function desenha() {
   }
   if (!efeitos.semBloom) efeitos.compoeBloom(c, w, h);
   // bordas de estado (chefe, mago, multibola), transições e reflexo do vidro: só nas margens da mesa
-  if (!sem.apres) { apres.bordas(c, v, J); apres.transicao(c, v, J); if (!S && qualidade < 3) apres.reflexo(c, v, dpr); }
+  if (!sem.apres) { apres.bordas(c, v, J); apres.transicao(c, v, J); if (!S && qualidade < 2) apres.reflexo(c, v, dpr); }
   const b0 = J.campo.bolas[0];
   if (!sem.caixa) caixa.desenha(c, Q.caixa, estado === 'atracao' ? null : J, tempo, b0 ? clamp(b0.x / W, 0, 1) : 0.5, b0 ? clamp((b0.y - J.campo.camY) / H, 0, 1) : 0.5, atracaoDmd, efeitos.semBloom);
   if (!sem.apres && estado !== 'atracao') apres.letreiro(c, Q.caixa);
-  if (Q.painel) painelDireito(c, Q.painel, J, def, modo === 'eterno' ? salvo.eterno(def.id) : null, tempo, (J as any).ranking || []);
-  if (Q.esquerda) { if (!miniCarta) miniCarta = compoe(caixa.camadas); painelEsquerdo(c, Q.esquerda, J, def, miniCarta, tempo); }
+  if (Q.painel || Q.esquerda) paineis();
   if (estado !== 'atracao') desenhaBotoes(c, Q, k, J.carregando ? J.carga : 0, !!J.bolaNaCanaleta() && !S, tempo, primeiraBola && J.estado === 'lancar' && !J.escolha && !apres.emEntrada);
   if (J.escolha) cartas();
   // clarão de evento: mais contido que antes (e quase nulo com movimento reduzido) para não ofuscar a bola
@@ -172,6 +171,22 @@ function atracaoDmd(d: CanvasRenderingContext2D, t: number) {
   if (fase === 0) { centroDmd(d, 'CINTILA 3', 20, 16, Math.floor(t * 3) % 2 ? '#7df9ff' : '#fff'); centroDmd(d, 'PINBALL DE ATAQUE', 46, 7, '#ff6fb5'); }
   else if (fase === 1) { centroDmd(d, 'RECORDES · ' + def.nome.toUpperCase(), 8, 7, '#7df9ff'); const r = salvo.ranking(def.id); if (!r.length) centroDmd(d, 'SEJA O PRIMEIRO', 36, 8, '#fff'); r.slice(0, 4).forEach((p, i) => { textoDmd(d, (i + 1) + '.', 40, 22 + i * 11, 7, '#b48cff', 'right'); textoDmd(d, milhar(p), 170, 22 + i * 11, 7, '#fff', 'right'); }); }
   else { centroDmd(d, salvo.desbloqueadas() + ' DE ' + MAQUINAS.length + ' MÁQUINAS', 20, 8, '#fff'); centroDmd(d, 'APERTE START', 44, 10, Math.floor(t * 4) % 2 ? '#ffd24a' : '#553'); }
+}
+
+/** painéis laterais do desktop: redesenhados em 8 Hz num canvas próprio e copiados nos outros quadros */
+let painelTela: HTMLCanvasElement | null = null, painelT = -1, painelChave = '';
+function paineis() {
+  const L = Q.esquerda, R = Q.painel, chave = tela.width + 'x' + tela.height + def.id;
+  if (!painelTela || painelChave !== chave || tempo - painelT > 0.125 || tempo < painelT) {
+    if (!painelTela || painelChave !== chave) { painelTela = novaTela(innerWidth, innerHeight, dpr)[0]; painelChave = chave; }
+    const pc = painelTela.getContext('2d')!; pc.setTransform(dpr, 0, 0, dpr, 0, 0); pc.clearRect(0, 0, innerWidth, innerHeight); painelT = tempo;
+    if (R) painelDireito(pc, R, J!, def, modo === 'eterno' ? salvo.eterno(def.id) : null, tempo, (J as any).ranking || []);
+    if (L) { if (!miniCarta) miniCarta = compoe(caixa.camadas); painelEsquerdo(pc, L, J!, def, miniCarta, tempo); }
+  }
+  // copia só os retângulos dos painéis (não a tela inteira)
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  for (const r of [L, R]) if (r) { const x = Math.max(0, Math.floor((r.x - 4) * dpr)), y = Math.max(0, Math.floor((r.y - 4) * dpr)), w2 = Math.min(painelTela.width - x, Math.ceil((r.w + 8) * dpr)), h2 = Math.min(painelTela.height - y, Math.ceil((r.h + 8) * dpr)); if (w2 > 0 && h2 > 0) c.drawImage(painelTela, x, y, w2, h2, x, y, w2, h2); }
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
 /** junta as 3 camadas do backglass numa imagem só (cartão do painel esquerdo) */
@@ -232,6 +247,9 @@ if (import.meta.env.DEV) {
     enterArena: (tipo: string) => { if (!J) return false; const b = J.mesa.bolas[0] || J.novaNaCanaleta(); J.estado = 'jogo'; J.iniciaTrans(criaArena(J, tipo), b, J.m.portal); return !!J.sub; },
     mago: () => J?.iniciaMago(),
     pulaIntro: () => apres.encerra(),
+    /** Visual R04: desenha um quadro já (com o laço parado) e diz onde a bola 0 está na tela, em pixels do canvas */
+    desenhaJa: () => desenha(),
+    bolaNaTela: () => { const b = J?.mesa.bolas[0]; if (!b) return null; pintor.mira(Q.mesa, CAM_MESA, J!.mesa.camY); const [X, Y, K] = pintor.p(b.x, b.y, 7 + b.z); return { x: X * dpr, y: Y * dpr, r: b.r * K * dpr }; },
     get apres() { return apres; },
     /** seção 12.4: tempo de quadro com 4 bolas e 300 partículas */
     medeQuadros: (n = 2000) => {

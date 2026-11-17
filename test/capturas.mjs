@@ -12,13 +12,13 @@ async function pagina(w, h) {
   const toque = w < 800;
   const ctx = await b.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: toque ? 2 : 1, hasTouch: toque, isMobile: toque });
   const p = await ctx.newPage();
-  p.on('pageerror', e => erros.push(`${w}x${h} pageerror: ${e}`)); p.on('console', m => { if (m.type() === 'error') erros.push(`${w}x${h} console: ${m.text()}`); });
+  p.on("pageerror", e => erros.push(`${w}x${h} pageerror: ${e.stack || e}`)); p.on('console', m => { if (m.type() === 'error') erros.push(`${w}x${h} console: ${m.text()}`); });
   await p.addInitScript(() => { try { localStorage.setItem('cintila3.desbloqueadas', '30'); localStorage.setItem('cintila3.prefs', JSON.stringify({ som: false, musica: false, narrador: false, canhoto: false, intro: true })); } catch {} });
   await p.goto(URL); await p.waitForFunction(() => !!window.__cintila); await p.waitForTimeout(900);
   return [p, ctx];
 }
 const joga = (p, id) => p.evaluate(id => { const C = window.__cintila; C.loadMachine(id); C.pulaIntro?.(); const J = C.jogo; for (let i = 0; i < 400 && J.escolha; i++) C.step(); J.lancar(0.9); for (let i = 0; i < 260; i++) C.step(); }, id);
-for (const [w, h] of VPS) {
+for (const [w, h] of VPS.filter(v => !process.env.SO || process.env.SO === v.join('x'))) {
   const [p, ctx] = await pagina(w, h), n = `${w}x${h}`;
   await p.screenshot({ path: `${pasta}/${n}-mapa.png` });
   for (const id of ['aurora', 'abissal', 'cidade-neon']) { await joga(p, id); await p.waitForTimeout(500); await p.screenshot({ path: `${pasta}/${n}-mesa-${id}.png` }); }
