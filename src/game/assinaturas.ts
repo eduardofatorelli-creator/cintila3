@@ -12,6 +12,8 @@ export interface Sig {
   mult?(tipo: string, b?: Bola | null): number;
   ritmo?(): number; update?(dt: number): void; inicio?(): void; bola?(): void;
   info?(): string; medidor?(): number;
+  /** só na máquina final: os seis poderes sorteados nesta partida (leitura para a apresentação) */
+  poderes?: readonly string[];
 }
 type Fab = (J: Game, p: AssinaturaDef) => Sig;
 const GOLPES = ['bumper', 'alvo', 'queda', 'rampa', 'orbita', 'chefe'];
@@ -264,6 +266,7 @@ export const ASSINATURAS: Record<string, Fab> = {
     const regras = embaralha(['compasso', 'calor', 'aceleracao', 'salto', 'serpente', 'cartas']).slice(0, 4);
     const tipos = [centro, chefe, ...regras], subs = tipos.map(t => ASSINATURAS[t](J, def(t, t.toUpperCase())));
     return {
+      poderes: Object.freeze(tipos.slice()),
       nome: p.nome, info: () => subs.map(s => s.info?.() || '').filter(Boolean)[Math.floor(J.tempo / 3) % subs.length] || '',
       medidor: () => { const s = subs[Math.floor(J.tempo / 3) % subs.length]; return s.medidor ? s.medidor() : 0; },
       ev: (t, b, d) => { for (const s of subs) s.ev?.(t, b, d); },

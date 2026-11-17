@@ -11,6 +11,7 @@ import { efeitoContinuo } from './assinaturas';
 import { RECEITAS } from './cenas';
 import { pChefe, retratoChefe } from './chefes';
 import { PALETAS, paletaDe, type PalR06 } from './paleta';
+import { lEsteira, pCativa, pElevador, pFlor, pGiratorio, pMirador, pPorta, pRoda } from './secundarias';
 import { antesPecas, pAlvo, pBanco, pBoca, pBumper, pEstilingue, pGiro, pPas, pPoste, pPosteCentral, pRampa, pSaucer, pTijolo, pVinil, paredes } from './pecas';
 
 /** backglass premium: cena da máquina no fundo, retrato do chefe, título em letreiro cromado */
@@ -48,8 +49,9 @@ function criaSkin(id: string): Skin {
     pecas: {
       bumper: ps(pBumper), estilingue: ps(pEstilingue), poste: (g, p) => pPoste(g, p), posteCentral: (g, p) => pPosteCentral(g, p), alvoFixo: ps(pAlvo), bancoDeQueda: ps(pBanco), rampa: ps(pRampa),
       portal: ps(pSaucer), travaDeBola: ps(pSaucer), giro: ps(pGiro), chefe: ps(pChefe), tijolo: ps(pTijolo), rodaDeVinil: ps(pVinil), pasDeMoinho: ps(pPas), bocaQueEngole: ps(pBoca),
+      alvoGiratorio: ps(pGiratorio), canhao: ps(pMirador), 'imã': ps(pMirador), bracoRobotico: ps(pMirador), elevador: ps(pElevador), portaMovel: ps(pPorta), rodaGigante: ps(pRoda), flor: ps(pFlor), bolaCativa: ps(pCativa),
     },
-    luzes: { bumper: null },
+    luzes: { bumper: null, esteira: ps(lEsteira) },
     paredes: (g, s) => paredes(g, s, P),
     palheta: P.palheta,
     antesPecas: (g, J) => antesPecas(g, J, P, (gg, JJ) => efeitoContinuo(gg, JJ, P)),

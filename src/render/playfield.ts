@@ -6,7 +6,7 @@ import { novaTela } from './tema';
 import { MATERIAIS, type Insert, type Material } from '../visual/manifesto';
 import { tom } from '../visual/pincel';
 import type { Skin } from '../visual/r05/skin';
-import { inserto, poe } from '../visual/r05/sprites';
+import { inserto, poe, rotulo } from '../visual/r05/sprites';
 import type { Game } from '../game/rules';
 
 type Ctx = CanvasRenderingContext2D;
@@ -90,8 +90,8 @@ export class Pintor implements Gfx {
     // R05: insertos em sprite (vidro facetado, aro, halo) quando a máquina tem skin
     if (this.skin) {
       const f = this.insert, fn = (cc: Ctx, RR: number) => formaInsert(cc, f, RR);
-      poe(c, inserto(f, fn, cor, R, false), X, Y); if (on > 0.05) poe(c, inserto(f, fn, cor, R, true), X, Y, Math.min(1, on));
-      if (rot && K > 0.55) { c.font = `700 ${Math.max(5, 5 * K)}px Orbitron, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'top'; c.fillStyle = on > 0.5 ? '#ffffff' : 'rgba(220,226,255,0.5)'; c.fillText(rot, X, Y + R * 1.3); }
+      poe(c, inserto(f, fn, cor, R, false), X, Y); if (on > 0.05) poe(c, inserto(f, fn, cor, R, true, !this.semBrilho), X, Y, Math.min(1, on));
+      if (rot && K > 0.55) poe(c, rotulo(rot, Math.max(5, 5 * K), on > 0.5), X, Y + R * 1.3);
       return;
     }
     // modo econômico (toque): só a lente na forma da máquina e o núcleo, sem moldura nem reflexo

@@ -8,6 +8,8 @@ let ok = true;
 for (const taxa of [1, 4, 6]) {
   const ctx = await b.newContext({ viewport: { width: 412, height: 915 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   const p = await ctx.newPage(); const cdp = await ctx.newCDPSession(p);
+  // SEMENTE fixa o sorteio (o jogo semeia com Date.now()): a máquina 30 sorteia peças diferentes a cada partida
+  if (process.env.SEMENTE) await p.addInitScript(v => { const t0 = +v; Date.now = () => t0; }, process.env.SEMENTE);
   if (process.env.DESBLOQ) await p.addInitScript(n => { try { localStorage.setItem('cintila3.desbloqueadas', n); } catch {} }, process.env.DESBLOQ);
   await p.goto(url); await p.waitForSelector('.cartao'); await p.getByText('▶ JOGAR').tap(); await p.waitForTimeout(800);
   if (process.env.SEM_ETAPAS) await p.evaluate(l => { for (const k of l.split(',')) { window.__cintila.sem[k] = true; window.__cintila.semEtapa[k] = true; } }, process.env.SEM_ETAPAS);

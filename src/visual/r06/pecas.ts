@@ -4,7 +4,7 @@ import type { Seg } from '../../core/physics';
 import type { Game } from '../../game/rules';
 import { formaInsert, type Pintor } from '../../render/playfield';
 import { alfa, tom } from '../pincel';
-import { bumper, cromo, decal, inserto, luzMacia, poe, poste, saucer, sprite } from '../r05/sprites';
+import { bumper, cromo, decal, inserto, luzMacia, poe, poste, resAtual, rotulo, saucer, sprite } from '../r05/sprites';
 import type { PalR06 } from './paleta';
 
 type Ctx = CanvasRenderingContext2D;
@@ -15,12 +15,13 @@ const pecasCache = new Map<string, { c: HTMLCanvasElement; x: number; y: number;
 export function limpaCachePecas() { pecasCache.clear(); }
 /** desenha a peça uma vez num canvas do tamanho da caixa dela e só copia nos quadros seguintes (o tremor entra na cópia) */
 export function cacheado(g: Pintor, chave: string, caixa: [number, number, number, number, number], f: () => void) {
-  const k = chave + '|' + g.s.toFixed(4) + '|' + g.cam.P + '|' + g.camY + '|' + devicePixelRatio; let e = pecasCache.get(k);
+  // na resolução real do quadro (no toque é 1×): copiar um cache 2× reduzido a cada quadro custava caro sem GPU
+  const R = resAtual(), k = chave + '|' + g.s.toFixed(4) + '|' + g.cam.P + '|' + g.camY + '|' + R; let e = pecasCache.get(k);
   if (!e) {
     const ox = g.ox, oy = g.oy, c0 = g.c; g.ox = 0; g.oy = 0;
     const pts = [[caixa[0], caixa[1], 0], [caixa[2], caixa[1], 0], [caixa[0], caixa[3], 0], [caixa[2], caixa[3], 0], [caixa[0], caixa[1], caixa[4]], [caixa[2], caixa[1], caixa[4]], [caixa[0], caixa[3], caixa[4]], [caixa[2], caixa[3], caixa[4]]].map(q => g.p(q[0], q[1], q[2]));
     const x = Math.floor(Math.min(...pts.map(q => q[0]))) - 6, y = Math.floor(Math.min(...pts.map(q => q[1]))) - 6, w = Math.ceil(Math.max(...pts.map(q => q[0]))) + 6 - x, h = Math.ceil(Math.max(...pts.map(q => q[1]))) + 6 - y;
-    const R = Math.min(2, devicePixelRatio || 1), cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(w * R)); cv.height = Math.max(1, Math.ceil(h * R)); const cc = cv.getContext('2d')!; cc.scale(R, R); cc.translate(-x, -y);
+    const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(w * R)); cv.height = Math.max(1, Math.ceil(h * R)); const cc = cv.getContext('2d')!; cc.scale(R, R); cc.translate(-x, -y);
     g.c = cc; try { f(); } finally { g.c = c0; g.ox = ox; g.oy = oy; }
     e = { c: cv, x, y, w, h }; if (pecasCache.size > 60) pecasCache.clear(); pecasCache.set(k, e);
   }
@@ -33,8 +34,8 @@ const forma = (n: string) => FORMAS[n] || (FORMAS[n] = (c: Ctx, R: number) => fo
 export function insertoSpr(g: Pintor, x: number, y: number, r: number, cor: string, on: number, f = 'estrela', rot?: string) {
   const [X, Y, K] = g.p(x, y, 0), R = r * K, fn = forma(f), c = g.c;
   poe(c, inserto(f, fn, cor, R, false), X, Y);
-  if (on > 0.05) poe(c, inserto(f, fn, cor, R, true), X, Y, Math.min(1, on));
-  if (rot && K > 0.5) { c.font = `700 ${Math.max(5, 5 * K)}px Orbitron, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'top'; c.fillStyle = on > 0.5 ? '#ffffff' : 'rgba(220,226,255,0.5)'; c.fillText(rot, X, Y + R * 1.25); }
+  if (on > 0.05) poe(c, inserto(f, fn, cor, R, true, !g.semBrilho), X, Y, Math.min(1, on));
+  if (rot && K > 0.5) poe(c, rotulo(rot, Math.max(5, 5 * K), on > 0.5), X, Y + R * 1.25);
 }
 
 // ---------- peças comuns ----------

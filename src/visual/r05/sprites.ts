@@ -8,6 +8,8 @@ const cache = new Map<string, Spr>();
 export interface Spr { c: HTMLCanvasElement; ox: number; oy: number; w: number; h: number }
 let RES = 1;
 /** resolução dos sprites (dpr do quadro); muda a chave do cache */
+/** resolução atual do quadro (a mesma dos sprites) */
+export const resAtual = () => RES;
 export function resolucao(r: number) { if (r !== RES) { RES = r; cache.clear(); } }
 const q = (v: number) => Math.round(v * 4) / 4;
 
@@ -71,11 +73,11 @@ export function poste(R: number, Hz: number, borracha = '#f2f4ff', topo = '#dfe6
 }
 
 /** inserto embutido: aro escuro, lente de vidro facetada; aceso tem núcleo quente e halo */
-export function inserto(nome: string, forma: (c: Ctx, R: number) => void, cor: string, R: number, aceso: boolean): Spr {
-  R = q(R); const m = R * (aceso ? 3.2 : 1.6);
-  return sprite(`in|${nome}|${cor}|${R}|${aceso}`, m * 2, m * 2, m, m, c => {
+export function inserto(nome: string, forma: (c: Ctx, R: number) => void, cor: string, R: number, aceso: boolean, halo = true): Spr {
+  R = q(R); const m = R * (aceso && halo ? 3.2 : 1.6);
+  return sprite(`in|${nome}|${cor}|${R}|${aceso}|${halo}`, m * 2, m * 2, m, m, c => {
     c.scale(1, 0.86);
-    if (aceso) { c.fillStyle = rad(c, 0, 0, R * 0.4, m, [[0, alfa(cor, 0.55)], [0.4, alfa(cor, 0.18)], [1, alfa(cor, 0)]]); c.fillRect(-m, -m * 1.2, m * 2, m * 2.4); }
+    if (aceso && halo) { c.fillStyle = rad(c, 0, 0, R * 0.4, m, [[0, alfa(cor, 0.55)], [0.4, alfa(cor, 0.18)], [1, alfa(cor, 0)]]); c.fillRect(-m, -m * 1.2, m * 2, m * 2.4); }
     c.fillStyle = '#020309'; forma(c, R * 1.22); c.fill(); c.strokeStyle = 'rgba(160,170,210,0.35)'; c.lineWidth = Math.max(0.5, R * 0.08); c.stroke();
     c.fillStyle = aceso ? rad(c, 0, 0, 0, R * 1.1, [[0, '#ffffff'], [0.35, tom(cor, 0.5)], [0.8, cor], [1, tom(cor, -0.3)]]) : rad(c, 0, 0, 0, R * 1.1, [[0, alfa(tom(cor, -0.2), 0.55)], [1, alfa(tom(cor, -0.65), 0.75)]]);
     forma(c, R); c.fill();
@@ -96,6 +98,12 @@ export function saucer(R: number, cor: string): Spr {
     c.strokeStyle = alfa(cor, 0.8); c.lineWidth = Math.max(0.8, R * 0.12); c.beginPath(); c.arc(0, 0, R * 1.36, 0, TAU); c.stroke();
     c.fillStyle = '#9aa3c0'; c.fillRect(-R * 0.25, R * 0.55, R * 0.5, R * 0.35);
   });
+}
+
+/** rótulo de inserto em sprite (texto desenhado uma vez por texto, tamanho e estado) */
+export function rotulo(txt: string, px: number, aceso: boolean): Spr {
+  px = Math.round(px * 2) / 2; const w = txt.length * px * 0.9 + 4;
+  return sprite(`rt|${txt}|${px}|${aceso}`, w, px * 1.6, w / 2, 0, c => { c.font = `700 ${px}px Orbitron, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'top'; c.fillStyle = aceso ? '#ffffff' : 'rgba(220,226,255,0.5)'; c.fillText(txt, 0, 0); });
 }
 
 /** poça de luz macia (somada com 'lighter') */
