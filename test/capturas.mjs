@@ -3,7 +3,7 @@
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 const URL = process.env.BASE_URL || 'http://localhost:4040/';
-const pasta = 'evidencias/visual-r04/' + (process.argv[2] || 'antes'); mkdirSync(pasta, { recursive: true });
+const pasta = (process.env.PASTA || 'evidencias/visual-r04/') + (process.argv[2] || 'antes'); mkdirSync(pasta, { recursive: true });
 const todas = process.argv[3] === 'todas';
 const VPS = [[1920, 1080], [1440, 900], [768, 1024], [390, 844], [360, 800]];
 const b = await chromium.launch({ channel: 'chrome' });

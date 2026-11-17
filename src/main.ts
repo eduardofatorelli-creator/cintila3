@@ -42,11 +42,20 @@ let acum = 0, ultimo = 0, tempo = 0, rodando = true, parado = 0, liberou = 0, pr
 const apres = new Apresentacao(); let ambiente: Ambiente | null = null, fxv: EfeitosVisuais | null = null, miniCarta: HTMLCanvasElement | null = null;
 const reduz = movimentoReduzido(); apres.reduzido = reduz; apres.curtas = prefs.curtas;
 
+let sonda: HTMLDivElement | null = null;
+/** lê env(safe-area-inset-top/bottom) por um elemento-sonda invisível */
+function margemSegura(): [number, number] {
+  try { if (!sonda) { sonda = document.createElement('div'); sonda.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)'; document.body.appendChild(sonda); }
+    const cs = getComputedStyle(sonda); return [parseFloat(cs.paddingTop) || 0, parseFloat(cs.paddingBottom) || 0]; } catch { return [0, 0]; }
+}
+function desloca(q: Quadro, dy: number) { q.mesa.oy += dy; for (const r of [q.caixa, q.apron, q.sacudir, q.painel, q.esquerda]) if (r) r.y += dy; }
 function ajusta() {
   // aparelho de toque já entra no degrau econômico: dpr 1 e bloom sem desfoque. O gargalo lá é rasterização.
   if (toque && qualidade === 0) { qualidade = 2; efeitos.max = 110; efeitos.simples = true; efeitos.semBloom = true; }
   dpr = Math.min(toque ? 1 : (qualidade >= 3 ? 1 : qualidade >= 2 ? 1.5 : 2), devicePixelRatio || 1); tela.width = Math.round(innerWidth * dpr); tela.height = Math.round(innerHeight * dpr);
-  Q = enquadra(innerWidth, innerHeight); resolucao(dpr);
+  // área segura (entalhe e barra de gestos): a mesa e o apron ficam dentro dela; o fundo continua ocupando a tela toda
+  const [sTop, sBot] = margemSegura();
+  Q = enquadra(innerWidth, innerHeight - sTop - sBot); if (sTop) desloca(Q, sTop); Q.h = innerHeight; resolucao(dpr);
 }
 addEventListener('resize', ajusta); ajusta();
 

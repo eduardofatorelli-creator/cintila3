@@ -103,6 +103,14 @@ export function pChefe(g: Pintor, ch: any, P: PalR06) {
   const [X0, Y0, K] = g.p(ch.x, ch.y, 0);
   poe(c, bumper(20 * K, 12 * 1.35 * K, { ...P.chefe.pedestal, decal: P.chefe.pedestal.tampa, forma: 'circulo' }, ch.dor > 0.3), X0, Y0);
   const bob = Math.sin(t * 2.2) * 1.6, [X, Y, KK] = g.p(ch.x, ch.y, 26 + bob), R = 22 * KK * 1.18, luz = P.chefe.pedestal.luz;
+  // modo econômico: chefe inteiro num sprite (corpo, olhos, acessório) + clarão do golpe real por cima
+  if (g.semBrilho) {
+    const Rq = Math.round(R * 2) / 2, n0 = f.pontas || 6, sp = sprite(`ce|${P.luz}|${P.chefe.material}|${P.chefe.acessorio}|${f.tipo}|${n0}|${Rq}`, Rq * 4.6, Rq * 4.6, Rq * 2.3, Rq * 2.3, cc => retratoChefe(cc, 0, 0, Rq, P, f));
+    const pul = 1 + ch.dor * 0.1; c.save(); c.translate(X, Y); c.scale(pul, pul); poe(c, sp, 0, 0);
+    if (ch.dor > 0.05) poe(c, corpoSpr(f.tipo, R, cor, M.aro, n0, true), 0, 0, ch.dor);
+    if (ch.protegido) { c.strokeStyle = alfa('#9fe8ff', 0.7); c.lineWidth = Math.max(1, R * 0.06); c.beginPath(); c.arc(0, 0, R * 1.45, 0, TAU); c.stroke(); }
+    c.restore(); return;
+  }
   if (!g.semBrilho) {
     c.save(); c.translate(X, Y); c.globalCompositeOperation = 'lighter'; poe(c, luzMacia(luz, R * 2.4), 0, 0, 0.3 + ch.dor * 0.5);
     c.rotate(t * 0.4); c.strokeStyle = alfa(M.aro, 0.5); c.lineWidth = Math.max(0.8, KK * 0.9); c.beginPath();

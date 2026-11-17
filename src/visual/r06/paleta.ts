@@ -17,6 +17,8 @@ export interface PalR06 {
   insertos: { bonus: string; missao: string; protegida: string };
   chefe: { material: MatChefe; acessorio: Acessorio; pedestal: { corpo: string; tampa: string; luz: string } };
   rotulo: string;
+  /** fio de luz das paredes mais presente (falso só na Aurora, que mantém o acabamento aprovado) */
+  fioForte?: boolean;
 }
 
 const P = (luz: string, bc: string, bt: string, bf: Decal, sp: string, sd: Decal, af: string, aa: string, pf: string, cr: string, ch: PalR06['chefe'], extra: Partial<PalR06> = {}): PalR06 => ({
@@ -33,7 +35,7 @@ const P = (luz: string, bc: string, bt: string, bf: Decal, sp: string, sd: Decal
 });
 
 export const PALETAS: Record<string, PalR06> = {
-  aurora: P('#7df9ff', '#4a3a9a', '#5fd8f0', 'estrela', '#b48cff', 'estrela', '#ffd27a', '#7df9ff', '#b48cff', '#c3cbe8', { material: 'rubi', acessorio: 'nenhum', pedestal: { corpo: '#3a0f22', tampa: '#5a1a2e', luz: '#ff3355' } }),
+  aurora: P('#7df9ff', '#4a3a9a', '#5fd8f0', 'estrela', '#b48cff', 'estrela', '#ffd27a', '#7df9ff', '#b48cff', '#c3cbe8', { material: 'rubi', acessorio: 'nenhum', pedestal: { corpo: '#3a0f22', tampa: '#5a1a2e', luz: '#ff3355' } }, { fioForte: false }),
   'passo-lunar': P('#ff4fd8', '#5a5f78', '#e8ecff', 'lua', '#ff4fd8', 'circulo', '#d8dcf0', '#4dd2ff', '#ff4fd8', '#e4e8f8', { material: 'prata', acessorio: 'raios', pedestal: { corpo: '#2a2a3e', tampa: '#5a5f78', luz: '#ff4fd8' } },
     { palheta: { corpo: '#f2f4fb', base: '#7a7f98', borracha: '#ff4fd8' }, parede: { topo: '#3a3a52', baixo: '#0a0a14', fio: '#ff4fd8', cromo: '#eef0fa' } }),
   bestiario: P('#8dff6a', '#3a2a14', '#8dff6a', 'olho', '#3ad6c0', 'folha', '#ffd166', '#8dff6a', '#ffd166', '#d8b878', { material: 'jade', acessorio: 'chifres', pedestal: { corpo: '#2a1a0a', tampa: '#5a3a1a', luz: '#8dff6a' } },

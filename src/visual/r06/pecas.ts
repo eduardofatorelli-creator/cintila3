@@ -73,6 +73,11 @@ export function pPosteCentral(g: Pintor, p: any) {
 
 export function pAlvo(g: Pintor, a: any, P: PalR06) {
   if (a.s.off) return;
+  // parado (sem flash): cópia em cache por estado real (aceso, vidas)
+  if (a.flash <= 0) { const s = a.s; cacheado(g, 'al' + P.alvo.face + s.ax + ',' + s.ay + (a.aceso ? 'a' : '') + a.vidas + (a.rotulo || ''), [Math.min(s.ax, s.bx) - 6, Math.min(s.ay, s.by) - 6, Math.max(s.ax, s.bx) + 6, Math.max(s.ay, s.by) + 6, 16], () => alvo(g, a, P)); return; }
+  alvo(g, a, P);
+}
+function alvo(g: Pintor, a: any, P: PalR06) {
   const s = a.s, c = g.c, h = 4 + 9 * (a.vidasMax > 1 ? a.vidas / a.vidasMax : 1);
   const a0 = g.p(s.ax, s.ay, 1), b0 = g.p(s.bx, s.by, 1), a1 = g.p(s.ax, s.ay, h), b1 = g.p(s.bx, s.by, h);
   c.strokeStyle = '#1a1c28'; c.lineWidth = 3 * a0[2]; c.beginPath(); c.moveTo(a0[0], a0[1] + 2); c.lineTo(b0[0], b0[1] + 2); c.stroke();
@@ -90,6 +95,10 @@ export function pAlvo(g: Pintor, a: any, P: PalR06) {
 }
 
 export function pBanco(g: Pintor, b: any, P: PalR06) {
+  if (b.flash <= 0) { const A = b.alvos as Seg[], xs = A.flatMap(s => [s.ax, s.bx]), ys = A.flatMap(s => [s.ay, s.by]); cacheado(g, 'bq' + P.banco + A[0].ax + ',' + A[0].ay + A.map(s => (s.off ? 1 : 0)).join(''), [Math.min(...xs) - 6, Math.min(...ys) - 6, Math.max(...xs) + 6, Math.max(...ys) + 6, 14], () => banco(g, b, P)); return; }
+  banco(g, b, P);
+}
+function banco(g: Pintor, b: any, P: PalR06) {
   const c = g.c;
   for (const s of b.alvos as Seg[]) {
     const h = s.off ? 1.2 : 11, a0 = g.p(s.ax, s.ay, 0), b0 = g.p(s.bx, s.by, 0), a1 = g.p(s.ax, s.ay, h), b1 = g.p(s.bx, s.by, h);
@@ -125,6 +134,10 @@ export function pSaucer(g: Pintor, s: any, P: PalR06) {
 }
 
 export function pGiro(g: Pintor, s: any, P: PalR06) {
+  if (s.energia <= 0) { cacheado(g, 'gi' + s.x + ',' + s.y + Math.round(Math.cos(s.ang) * 8), [s.x - 20, s.y - 6, s.x + 20, s.y + 6, 24], () => giro(g, s, P)); return; }
+  giro(g, s, P);
+}
+function giro(g: Pintor, s: any, P: PalR06) {
   const c = g.c, h = Math.abs(Math.cos(s.ang)) * 9 + 1, fr = Math.cos(s.ang) > 0;
   for (const dx of [-16, 16]) { const [X, Y, K] = g.p(s.x + dx, s.y, 0); poe(c, poste(2.2 * K, 15 * 1.35 * K, P.parede.cromo, '#ffffff'), X, Y); }
   const a = g.p(s.x - 16, s.y, 15), b = g.p(s.x + 16, s.y, 15); c.strokeStyle = cromo(c, a[0], b[0], P.parede.cromo); c.lineWidth = 1.6 * a[2]; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
@@ -202,7 +215,8 @@ export function paredes(g: Pintor, segs: Seg[], P: PalR06) {
     c.beginPath(); c.moveTo(a0[0], a0[1]); c.lineTo(b0[0], b0[1]); c.lineTo(b1[0], b1[1]); c.lineTo(a1[0], a1[1]); c.closePath();
     const gr = c.createLinearGradient(0, Math.min(a1[1], b1[1]), 0, Math.max(a0[1], b0[1])); gr.addColorStop(0, W.topo); gr.addColorStop(1, W.baixo); c.fillStyle = gr; c.fill();
     const lw = (s.tipo === 'porta' ? 2 : 3.2) * K; c.lineCap = 'round';
-    for (const [cor, l, o] of [['#0a0914', 1.35, 0], [alfa(W.fio, 0.55), 1.0, -0.05], [W.cromo, 0.62, -0.18], ['#ffffff', 0.2, -0.32]] as [string, number, number][]) { c.strokeStyle = cor; c.lineWidth = lw * l; c.beginPath(); c.moveTo(a1[0], a1[1] + lw * o); c.lineTo(b1[0], b1[1] + lw * o); c.stroke(); }
+    const camadas: [string, number, number][] = P.fioForte === false ? [['#0a0914', 1.35, 0], [alfa(W.fio, 0.55), 1.0, -0.05], [W.cromo, 0.62, -0.18], ['#ffffff', 0.2, -0.32]] : [['#0a0914', 1.35, 0], [alfa(W.fio, 0.9), 1.05, -0.05], [W.cromo, 0.4, -0.22], ['#ffffff', 0.16, -0.34]];
+    for (const [cor, l, o] of camadas) { c.strokeStyle = cor; c.lineWidth = lw * l; c.beginPath(); c.moveTo(a1[0], a1[1] + lw * o); c.lineTo(b1[0], b1[1] + lw * o); c.stroke(); }
   }
 }
 
