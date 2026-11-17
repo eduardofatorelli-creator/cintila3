@@ -24,6 +24,7 @@ import { EfeitosVisuais } from './visual/eventos';
 import { materialDe, visualDe } from './visual/manifesto';
 import { painelDireito, painelEsquerdo } from './visual/paineis';
 import { resolucao } from './visual/r05/sprites';
+import { registraAnuncio } from './visual/r06/assinaturas';
 
 const tela = document.getElementById('tela') as HTMLCanvasElement, c = tela.getContext('2d')!;
 const audio = new Audio(), efeitos = new Efeitos(), caixa = new Backbox(), pintor = new Pintor(c);
@@ -105,7 +106,7 @@ function passo(dt: number) {
   acum = Math.min(acum + dt, DT * 8);
   while (acum >= DT) { robo?.passo(DT); J.update(DT); acum -= DT; }
   if (estado === 'atracao' && J.estado === 'fim') { estado = 'menu'; J = null; ui.menu(); return; }
-  efeitos.recebe(J.fxs); efeitos.passo(dt); apres.observa(J.anuncios, J.cores); caixa.recebe(J.anuncios); caixa.passo(dt);
+  efeitos.recebe(J.fxs); efeitos.passo(dt); apres.observa(J.anuncios, J.cores); for (const a of J.anuncios) registraAnuncio(J, a.tipo, a.texto); caixa.recebe(J.anuncios); caixa.passo(dt);
   apres.passo(dt); fxv?.passo(dt); if (ambiente) { ambiente.forca = (J.mago ? 2 : J.multibola ? 1.4 : 1) * (qualidade >= 2 ? 0.6 : 1); ambiente.leve = qualidade >= 2; ambiente.passo(dt); }
   audio.nivel = J.mago ? 4 : J.multibola ? 3 : J.intensidade > 0.3 || J.sub ? 2 : 1; audio.progressao = J.sub ? 1 : 0;
 }

@@ -9,7 +9,8 @@ import { CENAS, InfoMesa, acabamento } from './cenas';
 import { MATERIAIS, visualDe } from './manifesto';
 import { Pincel, alfa } from './pincel';
 import { skinDe } from './r05/skin';
-import './r05/aurora';
+import './r06/skins';
+import { andarPremium } from './r06/andar';
 
 /** o que as cenas precisam saber da mesa real (posições lidas das peças montadas) */
 export function infoMesa(J: Game): InfoMesa {
@@ -36,6 +37,7 @@ export function texturaMesa(d: MachineDef, J: Game, escala = 2): HTMLCanvasEleme
 
 /** textura dos campos de cima (andar, chefão, subfases): a cena da máquina, apagada, com o emblema do tipo de fase */
 export function texturaAndar(d: MachineDef, J: Game, titulo: string, tipo: string): HTMLCanvasElement {
+  if (skinDe(d.id)) { try { return andarPremium(d, titulo, tipo, infoMesa(J)); } catch (e) { console.warn(e); } }
   const [t, c] = novaTela(W, H, 1.5), p = new Pincel(c, d.paleta, W, H), k = d.paleta, cena = CENAS[d.id];
   const sk = skinDe(d.id), pinta = sk ? sk.tablado : cena;
   if (pinta) { pinta(p, infoMesa(J)); p.ceu([[0, 'rgba(2,3,10,0.62)'], [1, 'rgba(2,3,10,0.8)']]); } else p.fundo();

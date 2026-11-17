@@ -31,9 +31,9 @@ const SQ = 0.8; // achatamento das elipses (câmera inclinada)
 export function sombra(c: Ctx, rx: number, ry: number, a = 0.6) { c.fillStyle = rad(c, 0, 0, 0, rx, [[0, `rgba(0,0,0,${a})`], [0.6, `rgba(0,0,0,${a * 0.5})`], [1, 'rgba(0,0,0,0)']]); c.save(); c.scale(1, ry / rx); c.beginPath(); c.arc(0, 0, rx, 0, TAU); c.restore(); c.fill(); }
 
 /** pop bumper: base cromada com parafusos, corpo de plástico fumê iluminado por dentro, saia de metal, tampa translúcida com decalque */
-export function bumper(R: number, Hz: number, cor: { corpo: string; tampa: string; luz: string; decal: string }, aceso: boolean): Spr {
+export function bumper(R: number, Hz: number, cor: { corpo: string; tampa: string; luz: string; decal: string; forma?: string; base?: string }, aceso: boolean): Spr {
   R = q(R); Hz = q(Hz); const W2 = R * 3.4, ox = W2 / 2, oy = Hz + R * 1.1;
-  return sprite(`bp|${R}|${Hz}|${cor.corpo}|${cor.tampa}|${cor.luz}|${aceso}`, W2, oy + R * 1.5, ox, oy, c => {
+  return sprite(`bp|${R}|${Hz}|${cor.corpo}|${cor.tampa}|${cor.luz}|${cor.forma || 'estrela'}|${cor.decal}|${aceso}`, W2, oy + R * 1.5, ox, oy, c => {
     c.save(); c.translate(R * 0.12, R * 0.2); sombra(c, R * 1.6, R * 0.95, 0.7); c.restore();
     // base de metal
     c.fillStyle = cromo(c, -R * 1.3, R * 1.3); elipse(c, 0, 0, R * 1.3, R * 1.3 * SQ); c.fill();
@@ -50,9 +50,8 @@ export function bumper(R: number, Hz: number, cor: { corpo: string; tampa: strin
     c.beginPath(); c.ellipse(0, yt, R * 1.12, R * 1.12 * SQ, 0, 0, Math.PI); c.lineTo(-R * 1.12, yc); c.ellipse(0, yc, R * 1.12, R * 1.12 * SQ, 0, Math.PI, 0, true); c.closePath(); c.fill();
     c.fillStyle = rad(c, 0, yc, R * 0.05, R * 1.12, [[0, aceso ? '#ffffff' : tom(cor.tampa, 0.55)], [0.55, aceso ? tom(cor.tampa, 0.3) : cor.tampa], [1, tom(cor.tampa, -0.4)]], -R * 0.3, yc - R * 0.35);
     elipse(c, 0, yc, R * 1.12, R * 1.12 * SQ); c.fill();
-    // decalque: estrela de 5 pontas
-    c.save(); c.translate(0, yc); c.scale(1, SQ); c.fillStyle = aceso ? '#ffffff' : cor.decal; c.globalAlpha = 0.9; c.beginPath();
-    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? R * 0.26 : R * 0.62; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); c.fill();
+    // decalque da máquina (estrela, engrenagem, gota, chama…)
+    c.save(); c.translate(0, yc); c.scale(1, SQ); c.fillStyle = aceso ? '#ffffff' : cor.decal; c.globalAlpha = 0.9; decal(c, cor.forma || 'estrela', R * 0.62); c.fill();
     c.globalAlpha = 1; c.strokeStyle = 'rgba(255,255,255,0.75)'; c.lineWidth = Math.max(0.6, R * 0.06); c.beginPath(); c.arc(0, 0, R * 1.04, Math.PI * 1.1, Math.PI * 1.75); c.stroke();
     c.strokeStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.arc(0, 0, R * 1.08, 0.2, Math.PI - 0.2); c.stroke(); c.restore();
     c.fillStyle = 'rgba(255,255,255,0.7)'; elipse(c, -R * 0.42, yc - R * 0.42, R * 0.22, R * 0.11); c.fill();
@@ -103,4 +102,31 @@ export function saucer(R: number, cor: string): Spr {
 export function luzMacia(cor: string, R: number): Spr {
   R = Math.max(4, Math.round(R / 4) * 4);
   return sprite(`lz|${cor}|${R}`, R * 2, R * 2, R, R, c => { c.fillStyle = rad(c, 0, 0, 0, R, [[0, alfa(cor, 0.9)], [0.25, alfa(cor, 0.45)], [0.6, alfa(cor, 0.12)], [1, alfa(cor, 0)]]); c.beginPath(); c.arc(0, 0, R, 0, TAU); c.fill(); });
+}
+
+/** contorno de decalque em raio R, centrado (preencher depois) */
+export function decal(c: Ctx, f: string, R: number) {
+  c.beginPath();
+  const poli = (n: number, r0: number, r1: number, rot = -Math.PI / 2) => { for (let i = 0; i < n * 2; i++) { const a = rot + i * Math.PI / n, r = i % 2 ? r1 : r0; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); };
+  switch (f) {
+    case 'circulo': c.arc(0, 0, R * 0.8, 0, TAU); c.moveTo(R * 0.4, 0); c.arc(0, 0, R * 0.4, 0, TAU, true); break;
+    case 'diamante': c.moveTo(0, -R); c.lineTo(R * 0.7, 0); c.lineTo(0, R); c.lineTo(-R * 0.7, 0); c.closePath(); break;
+    case 'engrenagem': poli(10, R, R * 0.74, 0); c.moveTo(R * 0.32, 0); c.arc(0, 0, R * 0.32, 0, TAU, true); break;
+    case 'gota': c.moveTo(0, -R); c.quadraticCurveTo(R * 0.85, R * 0.1, 0, R * 0.8); c.quadraticCurveTo(-R * 0.85, R * 0.1, 0, -R); break;
+    case 'chama': c.moveTo(0, -R); c.quadraticCurveTo(R * 0.9, -R * 0.1, R * 0.5, R * 0.6); c.quadraticCurveTo(0, R * 1.0, -R * 0.5, R * 0.6); c.quadraticCurveTo(-R * 0.9, -R * 0.1, 0, -R); break;
+    case 'floco': for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; c.moveTo(Math.cos(a) * R * 0.12, Math.sin(a) * R * 0.12); c.lineTo(Math.cos(a - 0.12) * R, Math.sin(a - 0.12) * R); c.lineTo(Math.cos(a + 0.12) * R, Math.sin(a + 0.12) * R); c.closePath(); } break;
+    case 'olho': c.ellipse(0, 0, R, R * 0.55, 0, 0, TAU); c.moveTo(R * 0.3, 0); c.arc(0, 0, R * 0.3, 0, TAU, true); break;
+    case 'raio': c.moveTo(R * 0.2, -R); c.lineTo(-R * 0.5, R * 0.1); c.lineTo(-R * 0.05, R * 0.1); c.lineTo(-R * 0.25, R); c.lineTo(R * 0.55, -R * 0.15); c.lineTo(R * 0.08, -R * 0.15); c.closePath(); break;
+    case 'folha': c.moveTo(0, -R); c.quadraticCurveTo(R * 0.85, 0, 0, R); c.quadraticCurveTo(-R * 0.85, 0, 0, -R); break;
+    case 'nota': c.ellipse(-R * 0.25, R * 0.45, R * 0.38, R * 0.28, -0.4, 0, TAU); c.rect(R * 0.05, -R * 0.9, R * 0.16, R * 1.35); c.rect(R * 0.05, -R * 0.9, R * 0.6, R * 0.2); break;
+    case 'coroa': c.moveTo(-R, R * 0.6); c.lineTo(-R, -R * 0.3); c.lineTo(-R * 0.5, R * 0.1); c.lineTo(0, -R * 0.8); c.lineTo(R * 0.5, R * 0.1); c.lineTo(R, -R * 0.3); c.lineTo(R, R * 0.6); c.closePath(); break;
+    case 'caveira': c.arc(0, -R * 0.15, R * 0.75, Math.PI * 0.8, Math.PI * 2.2); c.lineTo(R * 0.4, R * 0.85); c.lineTo(-R * 0.4, R * 0.85); c.closePath(); c.moveTo(-R * 0.08, -R * 0.1); c.arc(-R * 0.3, -R * 0.1, R * 0.22, 0, TAU, true); c.moveTo(R * 0.52, -R * 0.1); c.arc(R * 0.3, -R * 0.1, R * 0.22, 0, TAU, true); break;
+    case 'hex': poli(3, R, R, 0); break;
+    case 'lua': c.arc(0, 0, R * 0.85, 0.6, TAU - 0.6 + 0.0001); c.arc(R * 0.35, 0, R * 0.62, TAU - 0.9, 0.9, true); c.closePath(); break;
+    case 'onda': for (let k = 0; k < 2; k++) { const y = -R * 0.3 + k * R * 0.6; c.moveTo(-R, y); for (let x = -R; x <= R; x += R / 6) c.lineTo(x, y + Math.sin(x / R * 6) * R * 0.18); for (let x = R; x >= -R; x -= R / 6) c.lineTo(x, y + R * 0.2 + Math.sin(x / R * 6) * R * 0.18); c.closePath(); } break;
+    case 'triangulo': c.moveTo(0, -R); c.lineTo(R * 0.9, R * 0.7); c.lineTo(-R * 0.9, R * 0.7); c.closePath(); break;
+    case 'espiral': for (let i = 0; i <= 40; i++) { const a = i / 40 * TAU * 2, r = R * (0.15 + i / 40 * 0.85); c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } for (let i = 40; i >= 0; i--) { const a = i / 40 * TAU * 2, r = R * (0.05 + i / 40 * 0.6); c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); break;
+    case 'flor': for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; c.moveTo(0, 0); c.ellipse(Math.cos(a) * R * 0.5, Math.sin(a) * R * 0.5, R * 0.48, R * 0.22, a, 0, TAU); } break;
+    default: poli(5, R, R * 0.42);
+  }
 }

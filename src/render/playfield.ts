@@ -207,11 +207,11 @@ export function desenhaCampo(g: Pintor, campo: Campo, v: Vista, cam: Camera, o: 
   if (o.semBase) {
     // campo em rolagem (túnel): fundo simples e faixas que correm, paredes desenhadas ao vivo
     const q = [g.p(40, campo.camY), g.p(340, campo.camY), g.p(340, campo.camY + H), g.p(40, campo.camY + H)];
-    c.fillStyle = '#05060f'; c.beginPath(); q.forEach(p => c.lineTo(p[0], p[1])); c.fill();
+    if (g.skin?.tunel) g.skin.tunel(g, campo); else { c.fillStyle = '#05060f'; c.beginPath(); q.forEach(p => c.lineTo(p[0], p[1])); c.fill(); }
     for (let y = Math.floor(campo.camY / 80) * 80; y < campo.camY + H; y += 80) g.linha([[40, y, 0], [340, y, 0]], o.cores.c3, 2, 0.25);
     for (const s of campo.segs) if (!s.invisivel && !s.off && !s.dono && Math.max(s.ay, s.by) > campo.camY - 20 && Math.min(s.ay, s.by) < campo.camY + H + 20) g.muro(s.ax, Math.max(campo.camY - 10, s.ay), s.bx, Math.max(campo.camY - 10, s.by), 12, s.cor || '#889', 3);
   } else if (o.passo) { deforma(c, o.tex, v, cam, o.passo); paredes(g, campo, true); }
-  else if (!semEtapa.base && !o.basePronta) { const b = camadaBase(o.id, campo, o.tex, v, cam); c.drawImage(b.tela, v.ox - b.mx, v.oy - b.my); }
+  else if (!semEtapa.base && !o.basePronta) { const b = camadaBase(o.id, campo, o.tex, v, cam, g.skin); c.drawImage(b.tela, v.ox - b.mx, v.oy - b.my); }
   const visivel = (y: number) => y > campo.camY - 40 && y < campo.camY + H + 40;
   const S = g.skin;
   if (S && o.jogo && !semEtapa.luzR05) S.antesPecas(g, o.jogo);

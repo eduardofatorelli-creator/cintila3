@@ -11,9 +11,9 @@ const TAU = Math.PI * 2;
 const A = { ciano: '#7df9ff', verde: '#5dffb4', violeta: '#b48cff', rosa: '#ff6fb5', ouro: '#ffd27a', rubra: '#ff3355' };
 
 // ---------- ruído ----------
-function rnd(seed: number) { let s = seed; return () => ((s = (s * 16807) % 2147483647) / 2147483647); }
+export function rnd(seed: number) { let s = seed; return () => ((s = (s * 16807) % 2147483647) / 2147483647); }
 /** ruído fractal (value noise, 5 oitavas) em w×h, valores 0..1 */
-function fbm(w: number, h: number, seed: number, escala = 0.06, oit = 5): Float32Array {
+export function fbm(w: number, h: number, seed: number, escala = 0.06, oit = 5): Float32Array {
   const r = rnd(seed), G = 64, tab = new Float32Array(G * G).map(() => r()), out = new Float32Array(w * h);
   const v = (x: number, y: number) => { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, s = (t: number) => t * t * (3 - 2 * t), g = (i: number, j: number) => tab[((j % G + G) % G) * G + ((i % G + G) % G)];
     const a = g(xi, yi), b = g(xi + 1, yi), c = g(xi, yi + 1), d = g(xi + 1, yi + 1), u = s(xf), vv = s(yf); return a + (b - a) * u + (c - a) * vv + (a - b - c + d) * u * vv; };
@@ -22,7 +22,7 @@ function fbm(w: number, h: number, seed: number, escala = 0.06, oit = 5): Float3
 }
 const hex = (h: string) => { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
 /** pinta uma nuvem de ruído colorida (em baixa resolução, ampliada com suavização) */
-function nevoaRuido(c: Ctx, x: number, y: number, w: number, h: number, seed: number, cores: string[], alfaMax: number, mascara: (u: number, v: number) => number, limiar = 0.45) {
+export function nevoaRuido(c: Ctx, x: number, y: number, w: number, h: number, seed: number, cores: string[], alfaMax: number, mascara: (u: number, v: number) => number, limiar = 0.45) {
   const lw = Math.max(8, Math.round(w / 4)), lh = Math.max(8, Math.round(h / 4)), n = fbm(lw, lh, seed), cv = document.createElement('canvas'); cv.width = lw; cv.height = lh;
   const g = cv.getContext('2d')!, img = g.createImageData(lw, lh), cs = cores.map(hex);
   for (let j = 0; j < lh; j++) for (let i = 0; i < lw; i++) {
@@ -34,7 +34,7 @@ function nevoaRuido(c: Ctx, x: number, y: number, w: number, h: number, seed: nu
 }
 
 /** cortinas de aurora: traços verticais em baixa resolução, ampliados (desfoque) + raios finos em resolução cheia */
-function cortinas(c: Ctx, w: number, h: number, y0: number, alt: number, seed: number, forca = 1, espelho = false) {
+export function cortinas(c: Ctx, w: number, h: number, y0: number, alt: number, seed: number, forca = 1, espelho = false) {
   const r = rnd(seed), lw = Math.round(w / 3), lh = Math.round((alt * 1.6) / 3), cv = document.createElement('canvas'); cv.width = lw; cv.height = lh; const g = cv.getContext('2d')!;
   g.globalCompositeOperation = 'lighter';
   const bandas = [{ cor: A.verde, f: 0.3, amp: 0.16, y: 0.2, a: 0.85 }, { cor: '#3fe0d0', f: 1.9, amp: 0.12, y: 0.32, a: 0.55 }, { cor: A.violeta, f: 3.7, amp: 0.1, y: 0.1, a: 0.45 }];
@@ -54,7 +54,7 @@ function cortinas(c: Ctx, w: number, h: number, y0: number, alt: number, seed: n
   c.restore();
 }
 
-function estrelas(c: Ctx, w: number, y0: number, y1: number, seed: number, n: number, densa?: (x: number, y: number) => number) {
+export function estrelas(c: Ctx, w: number, y0: number, y1: number, seed: number, n: number, densa?: (x: number, y: number) => number) {
   const r = rnd(seed);
   for (let i = 0; i < n; i++) {
     const x = r() * w, y = y0 + r() * (y1 - y0); if (densa && r() > densa(x, y)) continue;
@@ -66,7 +66,7 @@ function estrelas(c: Ctx, w: number, y0: number, y1: number, seed: number, n: nu
 }
 
 /** serra de montanha: crista suave de ruído (3 oitavas), faces voltadas para a aurora com luz de borda, neve só nos pontos altos */
-function serra(c: Ctx, w: number, base: number, alt: number, seed: number, cor: string, borda: string, neve: boolean, picos = 6) {
+export function serra(c: Ctx, w: number, base: number, alt: number, seed: number, cor: string, borda: string, neve: boolean, picos = 6) {
   const r = rnd(seed), oit = [0, 1, 2].map(o => Array.from({ length: picos * (1 << o) + 2 }, () => r()));
   const alt1 = (u: number) => { let v = 0, a = 1, n = 0; oit.forEach((tb, o) => { const x = u * (picos * (1 << o)), i = Math.floor(x), f = x - i, s2 = (1 - Math.cos(f * Math.PI)) / 2; v += (tb[i] * (1 - s2) + tb[i + 1] * s2) * a; n += a; a *= 0.45; }); const q = v / n; return Math.pow(Math.max(0, q), 1.6); };
   const N = 120, pts: number[][] = []; for (let i = 0; i <= N; i++) { const u = i / N; pts.push([u * w, base - alt1(u) * alt * 1.6]); }
@@ -78,12 +78,12 @@ function serra(c: Ctx, w: number, base: number, alt: number, seed: number, cor: 
   if (neve) { c.strokeStyle = alfa('#eaf6ff', 0.5); c.lineWidth = 1.6; for (let i = 1; i < N; i++) { if (base - pts[i][1] < alt * 0.95) continue; c.beginPath(); c.moveTo(pts[i][0], pts[i][1] + 0.8); c.lineTo(pts[i + 1][0], pts[i + 1][1] + 0.8); c.stroke(); } }
 }
 
-function pinheiros(c: Ctx, x0: number, x1: number, base: number, alt: number, seed: number, cor: string, n: number) {
+export function pinheiros(c: Ctx, x0: number, x1: number, base: number, alt: number, seed: number, cor: string, n: number) {
   const r = rnd(seed); c.fillStyle = cor;
   for (let i = 0; i < n; i++) { const x = x0 + r() * (x1 - x0), h = alt * (0.55 + r() * 0.45), w = h * 0.32; c.beginPath(); c.moveTo(x, base - h); for (let k = 0; k < 4; k++) { const y = base - h + (k + 1) * h * 0.24; c.lineTo(x + w * (0.4 + k * 0.2), y); c.lineTo(x + w * 0.18, y - h * 0.04); } c.lineTo(x + 2, base); c.lineTo(x - 2, base); for (let k = 3; k >= 0; k--) { const y = base - h + (k + 1) * h * 0.24; c.lineTo(x - w * 0.18, y - h * 0.04); c.lineTo(x - w * (0.4 + k * 0.2), y); } c.closePath(); c.fill(); }
 }
 
-function observatorio(c: Ctx, x: number, y: number, s: number) {
+export function observatorio(c: Ctx, x: number, y: number, s: number) {
   c.fillStyle = '#0c0f26'; c.fillRect(x - 14 * s, y - 12 * s, 28 * s, 14 * s);
   const g = c.createLinearGradient(x - 16 * s, 0, x + 16 * s, 0); g.addColorStop(0, '#1a1e3e'); g.addColorStop(0.35, '#9aa6d0'); g.addColorStop(0.6, '#3a4068'); g.addColorStop(1, '#10132a');
   c.fillStyle = g; c.beginPath(); c.arc(x, y - 12 * s, 16 * s, Math.PI, TAU); c.fill();
@@ -94,7 +94,7 @@ function observatorio(c: Ctx, x: number, y: number, s: number) {
 }
 
 /** astrolábio de latão: anéis em relevo (sombra, ouro, brilho), marcações, numerais e rosa dos ventos */
-function astrolabio(c: Ctx, x: number, y: number, r: number) {
+export function astrolabio(c: Ctx, x: number, y: number, r: number) {
   const anel = (rr: number, l: number) => { for (const [cor, f, d] of [['rgba(0,0,0,0.6)', 1.6, 0.8], ['#8a5a1c', 1.15, 0], ['#e9bd62', 0.7, -0.3], ['#fff4cf', 0.22, -0.55]] as [string, number, number][]) { c.strokeStyle = cor; c.lineWidth = l * f; c.beginPath(); c.arc(x, y + d, rr, 0, TAU); c.stroke(); } };
   c.save();
   const fundo = c.createRadialGradient(x, y, r * 0.2, x, y, r * 1.2); fundo.addColorStop(0, 'rgba(40,20,70,0.0)'); fundo.addColorStop(0.7, 'rgba(10,8,30,0.55)'); fundo.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = fundo; c.beginPath(); c.arc(x, y, r * 1.2, 0, TAU); c.fill();
@@ -108,21 +108,21 @@ function astrolabio(c: Ctx, x: number, y: number, r: number) {
 }
 
 /** linha gravada em metal: sulco escuro + filete de luz */
-function gravada(c: Ctx, pts: number[][], cor: string, l = 1.2) {
+export function gravada(c: Ctx, pts: number[][], cor: string, l = 1.2) {
   c.lineCap = 'round'; c.lineJoin = 'round';
   for (const [k, w, dy] of [['rgba(0,0,0,0.65)', l * 2.2, 0.7], [cor, l, 0], ['rgba(255,255,255,0.55)', l * 0.35, -0.4]] as [string, number, number][]) { c.strokeStyle = k; c.lineWidth = w; c.beginPath(); pts.forEach((p, i) => (i ? c.lineTo(p[0], p[1] + dy) : c.moveTo(p[0], p[1] + dy))); c.stroke(); }
 }
-function estrelaGravada(c: Ctx, x: number, y: number, r: number, cor: string) {
+export function estrelaGravada(c: Ctx, x: number, y: number, r: number, cor: string) {
   c.save(); c.translate(x, y); c.globalCompositeOperation = 'lighter'; const g = c.createRadialGradient(0, 0, 0, 0, 0, r * 3); g.addColorStop(0, alfa(cor, 0.5)); g.addColorStop(1, alfa(cor, 0)); c.fillStyle = g; c.fillRect(-r * 3, -r * 3, r * 6, r * 6); c.globalCompositeOperation = 'source-over';
   c.fillStyle = '#f6f9ff'; c.beginPath(); for (let i = 0; i < 8; i++) { const a = i / 8 * TAU, rr = i % 2 ? r * 0.3 : r; c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } c.closePath(); c.fill(); c.restore();
 }
 
 /** luz geral: lâmpada embutida sob plástico (justifica a poça de luz) */
-function lampada(c: Ctx, x: number, y: number, r: number, cor: string, a = 0.5) {
+export function lampada(c: Ctx, x: number, y: number, r: number, cor: string, a = 0.5) {
   c.save(); c.globalCompositeOperation = 'lighter'; const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, alfa(cor, a)); g.addColorStop(0.3, alfa(cor, a * 0.4)); g.addColorStop(1, alfa(cor, 0)); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); c.restore();
 }
 
-function ceuNoturno(c: Ctx, w: number, h: number, seed: number, horizonte: number) {
+export function ceuNoturno(c: Ctx, w: number, h: number, seed: number, horizonte: number) {
   const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#02030f'); g.addColorStop(horizonte * 0.45, '#071036'); g.addColorStop(horizonte, '#12184a'); g.addColorStop(Math.min(1, horizonte + 0.02), '#060a24'); g.addColorStop(1, '#02030c'); c.fillStyle = g; c.fillRect(0, 0, w, h);
   // via láctea diagonal (ruído) e nebulosas
   const vl = (u: number, v: number) => { const d = Math.abs((v - 0.05) - (1 - u) * 0.55) ; return Math.max(0, 1 - d * 5) * (v < horizonte ? 1 : 0); };

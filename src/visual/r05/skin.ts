@@ -22,6 +22,8 @@ export interface Skin {
   palheta: { corpo: string; base: string; borracha: string };
   /** antes das peças: poças de luz e insertos de estado da partida */
   antesPecas(g: Pintor, J: Game): void;
+  /** fundo do túnel mágico (campo em rolagem) */
+  tunel?(g: Pintor, campo: import('../../core/physics').Campo): void;
   /** moldura do backbox */
   moldura?: boolean;
 }
