@@ -6,13 +6,14 @@ import type { Ret } from '../render/cabinet';
 import type { Vista } from '../render/playfield';
 import { visualDe } from './manifesto';
 import { alfa, tom } from './pincel';
+import { PRIORIDADE } from './estado';
 
 type Ctx = CanvasRenderingContext2D;
 const TAU = Math.PI * 2;
 const W = 400, H = 760;
 const suave = (u: number) => u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
 
-interface Letreiro { titulo: string; sub: string; cor: string; t: number; dur: number; forte: boolean }
+interface Letreiro { titulo: string; sub: string; cor: string; t: number; dur: number; forte: boolean; pr?: number; nasce?: number }
 
 /** qual acontecimento vira letreiro no backglass, com que cor e peso */
 function letreiroDe(a: Anuncio, k: { c1: string; c2: string; c3: string }): Omit<Letreiro, 't'> | null {
@@ -30,6 +31,9 @@ function letreiroDe(a: Anuncio, k: { c1: string; c2: string; c3: string }): Omit
     case 'desce': return { titulo: a.d?.venceu ? 'VITÓRIA' : 'DE VOLTA À MESA', sub: tx.split(' · ')[0], cor: a.d?.venceu ? '#ffd24a' : k.c2, dur: 1.6, forte: !!a.d?.venceu };
     case 'andarAceso': return { titulo: 'ANDAR DE CIMA ACESO', sub: 'RAMPA DIREITA OU PORTAL', cor: k.c1, dur: 2.0, forte: false };
     case 'missaoOk': return { titulo: 'MISSÃO CUMPRIDA', sub: tx, cor: k.c1, dur: 1.8, forte: false };
+    case 'missao': return { titulo: 'NOVA MISSÃO', sub: tx, cor: k.c2, dur: 1.5, forte: false };
+    case 'missaoFalha': return { titulo: 'MISSÃO PERDIDA', sub: tx, cor: '#ff5577', dur: 1.3, forte: false };
+    case 'evolucao': return { titulo: 'EVOLUÇÃO', sub: tx, cor: k.c3, dur: 1.5, forte: false };
     case 'atalho': return { titulo: 'ATALHO ABERTO', sub: 'PRÓXIMA MÁQUINA LIBERADA', cor: '#ffd24a', dur: 2.4, forte: true };
     case 'ataque': return { titulo: 'ATAQUE DO CHEFE', sub: tx, cor: '#ff4466', dur: 1.3, forte: false };
     case 'assinaturaTotal': return { titulo: tx.length > 22 ? tx.slice(0, 22) + '…' : tx, sub: '', cor: k.c3, dur: 2.0, forte: false };
@@ -53,13 +57,26 @@ export class Apresentacao {
   get emEntrada() { return this.entrada > 0; }
   /** lê os anúncios antes do painel de pontos consumi-los (só leitura) */
   observa(an: Anuncio[], k: { c1: string; c2: string; c3: string }) {
-    for (const a of an) { const l = letreiroDe(a, k); if (!l) continue; if (l.forte) this.fila = this.fila.filter(x => x.forte); this.fila.push({ ...l, t: 0 }); if (this.fila.length > 3) this.fila.shift(); }
+    for (const a of an) {
+      const l = letreiroDe(a, k); if (!l) continue;
+      const pr = PRIORIDADE[a.tipo] ?? 1, item: Letreiro = { ...l, t: 0, pr, nasce: this.t };
+      // especial chegando: o letreiro comum/importante da vez sai logo (não some de repente: 0,2 s de saída)
+      if (this.atual && pr > (this.atual.pr ?? 1)) this.atual.t = Math.max(this.atual.t, this.atual.dur - 0.2);
+      // fila ordenada por prioridade e, dentro dela, pela ordem dos acontecimentos
+      let i = this.fila.length; while (i > 0 && (this.fila[i - 1].pr ?? 1) < pr) i--; this.fila.splice(i, 0, item);
+      if (this.fila.length > 4) { let pior = 0; this.fila.forEach((x, j) => { if ((x.pr ?? 1) <= (this.fila[pior].pr ?? 1)) pior = j; }); this.fila.splice(pior, 1); }
+      if (pr >= 2) this.especial = { cor: l.cor, t: 0.7 };
+    }
   }
   passo(dt: number) {
     this.t += dt; if (this.entrada > 0) this.entrada = Math.max(0, this.entrada - dt);
     if (this.atual) { this.atual.t += dt * (this.fila.length ? 1.6 : 1); if (this.atual.t >= this.atual.dur) this.atual = null; }
-    if (!this.atual && this.fila.length) this.atual = this.fila.shift()!;
+    // letreiros que esperaram demais já não dizem respeito ao presente: saem da fila (especiais aguentam mais)
+    while (!this.atual && this.fila.length) { const x = this.fila.shift()!; if (this.t - (x.nasce ?? this.t) < ((x.pr ?? 1) >= 2 ? 4 : 2.5)) this.atual = x; }
+    if (this.especial) { this.especial.t -= dt; if (this.especial.t <= 0) this.especial = null; }
   }
+  /** pulso de borda dos eventos especiais */
+  especial: { cor: string; t: number } | null = null;
 
   /** letreiro no backglass, por cima da arte e acima do painel de pontos (nunca sobre a mesa) */
   letreiro(c: Ctx, r: Ret) {
@@ -71,14 +88,17 @@ export class Apresentacao {
     // faixa opaca sobre toda a área da arte: o letreiro nunca se mistura ao título do backglass
     c.globalAlpha = a * 0.94; c.fillStyle = '#03040c'; c.fillRect(r.x + m, cy - h * 0.5 * ent, r.w - m * 2, h * ent);
     c.globalAlpha = a; c.fillStyle = L.cor; c.fillRect(r.x + m, cy - h * 0.5 * ent, r.w - m * 2, 2); c.fillRect(r.x + m, cy + h * 0.5 * ent - 2, r.w - m * 2, 2);
-    const tam = Math.min(h * 0.36, r.w / Math.max(8, L.titulo.length) * 1.25);
-    c.font = `800 ${tam}px Orbitron, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
-    const x = r.x + r.w / 2 + (1 - ent) * r.w * 0.3, y = cy - (L.sub ? tam * 0.3 : 0);
-    c.lineWidth = tam * 0.16; c.strokeStyle = 'rgba(0,0,0,0.8)'; c.strokeText(L.titulo, x, y);
-    const g = c.createLinearGradient(0, y - tam / 2, 0, y + tam / 2); g.addColorStop(0, '#ffffff'); g.addColorStop(0.5, L.cor); g.addColorStop(1, tom(L.cor, -0.3)); c.fillStyle = g; c.fillText(L.titulo, x, y);
+    // título: escala para caber; se nem assim couber, quebra em duas linhas
+    let tam = Math.min(h * 0.36, 40), linhasT = [L.titulo]; c.font = `800 ${tam}px Orbitron, sans-serif`; const maxW = r.w - m * 4;
+    if (c.measureText(L.titulo).width > maxW) { tam = Math.max(h * 0.2, tam * maxW / c.measureText(L.titulo).width); c.font = `800 ${tam}px Orbitron, sans-serif`;
+      if (c.measureText(L.titulo).width > maxW && L.titulo.includes(' ')) { const p = L.titulo.split(' '), meio = Math.ceil(p.length / 2); linhasT = [p.slice(0, meio).join(' '), p.slice(meio).join(' ')]; tam = Math.min(tam * 1.3, h * 0.26); c.font = `800 ${tam}px Orbitron, sans-serif`; const mw = Math.max(...linhasT.map(s => c.measureText(s).width)); if (mw > maxW) { tam *= maxW / mw; c.font = `800 ${tam}px Orbitron, sans-serif`; } } }
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    const x = r.x + r.w / 2 + (1 - ent) * r.w * 0.3, y0 = cy - (L.sub ? tam * 0.3 : 0) - (linhasT.length - 1) * tam * 0.55;
+    linhasT.forEach((s, i) => { const y = y0 + i * tam * 1.1; c.lineWidth = tam * 0.16; c.strokeStyle = 'rgba(0,0,0,0.8)'; c.strokeText(s, x, y); const g = c.createLinearGradient(0, y - tam / 2, 0, y + tam / 2); g.addColorStop(0, '#ffffff'); g.addColorStop(0.5, L.cor); g.addColorStop(1, tom(L.cor, -0.3)); c.fillStyle = g; c.fillText(s, x, y); });
+    const y = y0 + (linhasT.length - 1) * tam * 1.1;
     // brilho que corre sobre as letras
     if (!this.reduzido) { const sx = r.x + (u * 1.6 - 0.3) * r.w; const gl = c.createLinearGradient(sx - 40, 0, sx + 40, 0); gl.addColorStop(0, 'rgba(255,255,255,0)'); gl.addColorStop(0.5, 'rgba(255,255,255,0.45)'); gl.addColorStop(1, 'rgba(255,255,255,0)'); c.globalCompositeOperation = 'lighter'; c.fillStyle = gl; c.fillRect(r.x, cy - h * 0.36, r.w, h * 0.72); c.globalCompositeOperation = 'source-over'; }
-    if (L.sub) { c.font = `700 ${Math.max(9, tam * 0.36)}px Orbitron, sans-serif`; c.fillStyle = '#e8ecff'; c.fillText(L.sub, x, y + tam * 0.78); }
+    if (L.sub) { let ts = Math.max(9, tam * 0.36); c.font = `700 ${ts}px Orbitron, sans-serif`; const sw = c.measureText(L.sub).width; if (sw > maxW) { ts = Math.max(7, ts * maxW / sw); c.font = `700 ${ts}px Orbitron, sans-serif`; } c.fillStyle = '#e8ecff'; c.fillText(L.sub, x, y + tam * 0.78); }
     c.restore();
   }
 
@@ -90,6 +110,7 @@ export class Apresentacao {
     if (J.mago) { cor = k.c1; a = 0.35 + Math.sin(t * 4) * 0.12; }
     else if (tensao) { cor = '#ff2a48'; a = 0.22 + Math.sin(t * 5) * (this.reduzido ? 0.02 : 0.1); }
     else if (J.multibola) { cor = '#ffd24a'; a = 0.2; }
+    if (this.especial && !this.reduzido) { cor = this.especial.cor; a = Math.max(a, this.especial.t * 0.6); }
     if (cor) {
       const e = Math.min(w, h) * 0.12;
       const faixa = (x0: number, y0: number, x1: number, y1: number, rx: number, ry: number, rw: number, rh: number) => { const g = c.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, alfa(cor, a)); g.addColorStop(1, alfa(cor, 0)); c.fillStyle = g; c.fillRect(rx, ry, rw, rh); };

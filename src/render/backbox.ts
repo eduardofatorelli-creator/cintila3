@@ -8,6 +8,7 @@ import { materialDe } from '../visual/manifesto';
 import { Pincel, alfa, tom } from '../visual/pincel';
 import { CENAS, infoPadrao } from '../visual/cenas';
 import { skinDe } from '../visual/r05/skin';
+import { enfileiraDmd, estadoMissao, fotografa } from '../visual/estado';
 
 type Ctx = CanvasRenderingContext2D;
 const LW = 192, LH = 64, TAU = Math.PI * 2;
@@ -16,7 +17,14 @@ const milhar = (n: number) => Math.round(n).toLocaleString('pt-BR');
 
 function T(d: Ctx, s: string, x: number, y: number, tam = 8, cor = '#fff', al: CanvasTextAlign = 'center') { d.font = F(tam); d.textAlign = al; d.textBaseline = 'middle'; d.fillStyle = cor; d.fillText(s, Math.round(x), Math.round(y)); }
 function cabe(d: Ctx, s: string, max: number, tam = 8) { d.font = F(tam); let t = tam; while (t > 5 && d.measureText(s).width > max) { t--; d.font = F(t); } return t; }
-function TC(d: Ctx, s: string, y: number, tam = 8, cor = '#fff') { T(d, s, LW / 2, y, cabe(d, s, LW - 6, tam), cor); }
+function TC(d: Ctx, s: string, y: number, tam = 8, cor = '#fff') { const tt = cabe(d, s, LW - 6, tam); if (d.measureText(s).width > LW - 6) { TR(d, s, 3, y, LW - 6, tt, cor, relogioDmd); return; } T(d, s, LW / 2, y, tt, cor); }
+let relogioDmd = 0;
+/** texto que não cabe nem no menor tamanho rola horizontalmente dentro da faixa (nunca é cortado sem aviso) */
+function TR(d: Ctx, s: string, x: number, y: number, w: number, tam: number, cor: string, t: number) {
+  d.font = F(tam); const L = d.measureText(s).width; if (L <= w) { T(d, s, x, y, tam, cor, 'left'); return; }
+  const vai = L - w + 6, off = vai * (0.5 - 0.5 * Math.cos(t * 0.9));
+  d.save(); d.beginPath(); d.rect(x, y - tam, w, tam * 2); d.clip(); T(d, s, x - off, y, tam, cor, 'left'); d.restore();
+}
 function barra(d: Ctx, x: number, y: number, w: number, h: number, u: number, cor: string) { d.strokeStyle = cor; d.lineWidth = 1; d.strokeRect(x + 0.5, y + 0.5, w, h); d.fillStyle = cor; d.fillRect(x + 2, y + 2, Math.max(0, (w - 3) * Math.min(1, u)), h - 3); }
 
 interface Anim { a: Anuncio; t: number; dur: number }
@@ -113,10 +121,8 @@ export class Backbox {
   recebe(an: Anuncio[]) {
     for (const a of an) {
       if (!ANIMS[a.tipo]) continue;
-      const dur = ANIMS[a.tipo][0];
-      if (a.tipo === 'missaoAvanca' || a.tipo === 'chefeDano' || a.tipo === 'combo' || a.tipo === 'assinatura' || a.tipo === 'poste') { if (this.fila.length > 1) continue; }
-      if (a.tipo === 'fim' || a.tipo === 'tilt' || a.tipo === 'bonus') this.fila = [];
-      this.fila.push({ a, t: 0, dur }); if (this.fila.length > 5) this.fila.splice(0, this.fila.length - 5);
+      // R06: a animação guarda o valor do momento do evento e a fila substitui progressos antigos pelo mais novo
+      this.fila = enfileiraDmd(this.fila, { a: fotografa(a), t: 0, dur: ANIMS[a.tipo][0] }) as Anim[];
     }
     an.length = 0;
   }
@@ -127,7 +133,7 @@ export class Backbox {
   get ocupado() { return !!this.atual; }
 
   private base(d: Ctx, J: Game, t: number) {
-    const k = J.cores, ch = J.m.chefe;
+    const k = J.cores, ch = J.m.chefe; relogioDmd = t;
     d.save(); d.translate(15, 15); d.scale(11, 11); if (!ch.c.off) desenhaChefe(d, J.def.chefe.forma, k, t, ch.dor); d.restore();
     for (let i = 0; i < Math.min(8, ch.vida); i++) { d.fillStyle = '#ff4466'; d.fillRect(3 + i * 4, 30, 3, 3); }
     const s = milhar(J.pontos); T(d, s, 188, 13, cabe(d, s, 150, 16), '#fff', 'right');
@@ -135,7 +141,7 @@ export class Backbox {
     if (S) {
       // durante a fase em outro campo: contagem regressiva, progresso e a mesa de baixo em miniatura
       T(d, Math.ceil(S.resta) + '', 56, 44, 14, S.resta < 6 && Math.floor(t * 4) % 2 ? '#ff5577' : k.c1);
-      T(d, S.dica, 76, 38, cabe(d, S.dica, 82, 6), '#fff', 'left'); barra(d, 76, 46, 80, 7, S.progresso, k.c2);
+      TR(d, S.dica, 76, 38, 84, cabe(d, S.dica, 84, 6), '#fff', t); barra(d, 76, 46, 80, 7, S.progresso, k.c2);
       if (S.ataque) T(d, S.ataque.toUpperCase(), 76, 59, 5, '#ff5577', 'left');
       d.strokeStyle = k.c3; d.strokeRect(164.5, 26.5, 24, 36); d.fillStyle = k.c3; d.globalAlpha = 0.6;
       for (const sg of J.mesa.segs) if (!sg.invisivel && !sg.dono) { d.fillRect(165 + sg.ax / 400 * 23, 27 + sg.ay / 760 * 35, 1, 1); }
@@ -143,11 +149,11 @@ export class Backbox {
       return;
     }
     if (J.mago) { T(d, J.def.mago.nome.toUpperCase(), 34, 30, cabe(d, J.def.mago.nome.toUpperCase(), 150, 7), Math.floor(t * 6) % 2 ? '#fff' : k.c1, 'left'); T(d, Math.ceil(J.magoT) + 'S', 34, 44, 10, '#fff', 'left'); barra(d, 76, 39, 110, 9, J.magoN / J.def.mago.regra.meta, k.c1); T(d, J.magoN + '/' + J.def.mago.regra.meta + ' GOLPES', 188, 57, 6, k.c2, 'right'); return; }
-    const m = J.missoes[J.missaoAtiva];
+    const M = estadoMissao(J);
     const esq = J.modo === 'eterno' ? 'DEGRAU ' + (J.degrau + 1) + ' · ' + relogio(J.tempoJogo) : 'BOLA ' + Math.min(J.bola, J.bolasTotal) + (J.extras ? '+' + J.extras : '');
     T(d, esq, 34, 30, 7, k.c1, 'left'); T(d, J.bonusX + 'X', 188, 30, 7, k.c2, 'right');
     if (J.dobro > 0) T(d, 'DOBRO ' + Math.ceil(J.dobro), 130, 30, 6, '#ffd24a');
-    if (m) { const s2 = m.nome.toUpperCase(); T(d, s2, 4, 42, cabe(d, s2, 120, 6), '#fff', 'left'); T(d, Math.ceil(J.missaoT) + 'S', 188, 42, 6, J.missaoT < 10 ? '#ff5577' : k.c3, 'right'); barra(d, 4, 49, 150, 8, m.n / m.meta, k.c1); T(d, m.n + '/' + m.meta, 188, 54, 6, '#fff', 'right'); return; }
+    if (M.ativa) { const s2 = M.nome.toUpperCase(); TR(d, s2, 4, 42, 150, cabe(d, s2, 150, 6), '#fff', t); T(d, M.tempo + 'S', 188, 42, 6, M.tempo < 10 ? '#ff5577' : k.c3, 'right'); barra(d, 4, 49, 150, 8, M.n / M.meta, k.c1); T(d, M.n + '/' + M.meta, 188, 54, 6, '#fff', 'right'); return; }
     const sg = J.sigs[0], linhas: string[] = [];
     if (J.andarAceso) linhas.push('ANDAR DE CIMA ACESO: RAMPA DIREITA');
     if (J.camaraAcesa) linhas.push('CÂMARA ALTA: RAMPA ESQUERDA');
@@ -156,7 +162,7 @@ export class Backbox {
     if (J.salva > 0 && J.estado === 'jogo') linhas.push('BOLA PROTEGIDA ' + Math.ceil(J.salva) + ' S');
     linhas.push(J.def.assinatura.dica.toUpperCase());
     const l = linhas[Math.floor(t / 2.6) % linhas.length] || '';
-    T(d, l, 96, 43, cabe(d, l, 186, 6), '#fff');
+    TC(d, l, 43, 6, '#fff');
     if (sg?.medidor) barra(d, 30, 51, 132, 7, sg.medidor(), k.c3);
     else { for (let i = 0; i < 5; i++) { d.fillStyle = J.missoes[i].feita ? k.c1 : '#334'; d.fillRect(60 + i * 15, 52, 12, 6); } }
   }
@@ -179,7 +185,8 @@ export class Backbox {
     this.quadro++; const W2 = Math.round(dw), H2 = Math.round(dh);
     if (soPainel && this.pronto && this.pronto.width === W2 && this.quadro % 2) { c.drawImage(this.pronto, dx, dy, dw, dh); return; }
     d.setTransform(1, 0, 0, 1, 0, 0); d.globalAlpha = 1; d.fillStyle = '#06030a'; d.fillRect(0, 0, LW, LH);
-    if (this.atual) { const A = this.atual; d.save(); ANIMS[A.a.tipo][1](d, A.t / A.dur, A.a, k, J!, t); d.restore(); d.globalAlpha = 1; }
+    // sem jogo (modo de atração ou pintura do fundo parado) não roda animação de evento: várias leem J.def (era o erro intermitente "reading 'def'")
+    if (this.atual && J) { const A = this.atual; d.save(); ANIMS[A.a.tipo][1](d, A.t / A.dur, A.a, k, J, t); d.restore(); d.globalAlpha = 1; }
     else if (J) this.base(d, J, t); else if (atracao) atracao(d, t);
     if (soPainel) {
       if (!this.pronto || this.pronto.width !== W2) { this.pronto = novaTela(W2, H2)[0]; }

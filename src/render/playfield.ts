@@ -21,6 +21,10 @@ export class Pintor implements Gfx {
   mat: Material = MATERIAIS.cromo; insert: Insert = 'redondo'; luzCor = '#7df9ff';
   /** R05: skin da máquina (desenho de peças por sprite); null mantém o desenho R04 */
   skin: Skin | null = null;
+  /** luminância do tablado da mesa (40×76) para o contraste adaptativo da bola */
+  fundoLum: Float32Array | null = null;
+  /** luminância do fundo no ponto (0..1); 0,25 quando desconhecida */
+  lumEm(x: number, y: number) { const L = this.fundoLum; if (!L || this.camY) return 0.25; const i = Math.max(0, Math.min(39, Math.floor(x / 10))), j = Math.max(0, Math.min(75, Math.floor(y / 10))); return L[j * 40 + i]; }
   private grads = new Map<string, CanvasGradient>();
   constructor(public c: Ctx) {}
   /** gradiente de corpo cilíndrico em coordenadas locais (centro em 0), guardado por cor e raio */
@@ -177,10 +181,11 @@ function palheta(g: Pintor, p: Palheta, c1: string, c2: string) {
   rg.addColorStop(0, '#ffffff'); rg.addColorStop(0.5, M.metal[1]); rg.addColorStop(1, M.metal[0]); c.fillStyle = rg; c.beginPath(); c.arc(pv[0], pv[1], R, 0, TAU); c.fill();
 }
 
-export function desenhaBola(g: Pintor, b: { x: number; y: number; z: number; r: number; cor?: string; rastro: number[] }, cor: string) {
+export function desenhaBola(g: Pintor, b: { x: number; y: number; z: number; r: number; cor?: string; rastro: number[]; vx?: number; vy?: number }, cor: string, extra = false) {
   if (b.z < -1) return;
-  const c = g.c, r = b.rastro;
-  if (!g.semBrilho) for (let i = 0; i < r.length - 2; i += 2) { const u = i / r.length; g.disco(r[i], r[i + 1], b.r * (0.3 + u * 0.6), b.cor || cor, 7 + b.z, u * 0.28); }
+  const c = g.c, r = b.rastro, rapida = Math.hypot(b.vx || 0, b.vy || 0) > 650;
+  // rastro só quando a bola está rápida (é quando o olho a perde)
+  if (!g.semBrilho && rapida) for (let i = 0; i < r.length - 2; i += 2) { const u = i / r.length; g.disco(r[i], r[i + 1], b.r * (0.3 + u * 0.6), b.cor || cor, 7 + b.z, u * 0.28); }
   const [sx, sy, sk] = g.p(b.x, b.y + 2, 0);
   c.fillStyle = 'rgba(0,0,0,0.6)'; c.beginPath(); c.ellipse(sx, sy, b.r * sk * (1 + b.z * 0.01), b.r * sk * 0.45, 0, 0, TAU); c.fill();
   const [X, Y, K] = g.p(b.x, b.y, 7 + b.z), R = b.r * K;
@@ -192,7 +197,10 @@ export function desenhaBola(g: Pintor, b: { x: number; y: number; z: number; r: 
   else { gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.3, '#eef2ff'); gr.addColorStop(0.62, '#a3abc4'); gr.addColorStop(0.88, '#454b66'); gr.addColorStop(1, '#1b1e2c'); }
   c.fillStyle = gr; c.beginPath(); c.arc(X, Y, R, 0, TAU); c.fill();
   c.save(); c.clip(); c.globalAlpha = 0.4; c.fillStyle = g.luzCor; c.beginPath(); c.ellipse(X, Y + R * 0.6, R * 0.95, R * 0.28, 0, 0, TAU); c.fill(); c.restore();
-  c.strokeStyle = 'rgba(5,6,14,0.75)'; c.lineWidth = Math.max(0.6, R * 0.12); c.beginPath(); c.arc(X, Y, R, 0, TAU); c.stroke();
+  // contraste adaptativo: contorno escuro proporcional à claridade do fundo; aro claro sobre fundo escuro (onde há estrelas)
+  const L = g.lumEm(b.x, b.y);
+  c.strokeStyle = `rgba(5,6,14,${(0.55 + L * 0.4).toFixed(2)})`; c.lineWidth = Math.max(0.7, R * (0.1 + L * 0.14)); c.beginPath(); c.arc(X, Y, R, 0, TAU); c.stroke();
+  if (L < 0.5 || extra) { c.strokeStyle = extra ? g.luzCor : `rgba(235,242,255,${(0.75 - L).toFixed(2)})`; c.globalAlpha = extra ? 0.85 : 1; c.lineWidth = Math.max(0.6, R * 0.1); c.beginPath(); c.arc(X, Y, R * 1.2, 0, TAU); c.stroke(); c.globalAlpha = 1; }
   c.fillStyle = '#ffffff'; c.beginPath(); c.arc(X - R * 0.38, Y - R * 0.42, R * 0.2, 0, TAU); c.fill();
   g.glow(b.x, b.y, b.r * 1.7, b.cor || cor, 7 + b.z, 0.55);
 }
@@ -220,7 +228,7 @@ export function desenhaCampo(g: Pintor, campo: Campo, v: Vista, cam: Camera, o: 
   const lista: { y: number; f: () => void }[] = [];
   if (!semEtapa.pecas) for (const p of campo.pecas) { if (semEtapa['p_' + p.tipo]) continue; const f = S?.pecas[p.tipo]; if ((f || p.desenhar) && visivel(p.y)) lista.push({ y: p.y, f: f ? () => f(g, p) : () => p.desenhar!(g) }); }
   for (const p of campo.pas) lista.push({ y: p.py + 8, f: () => palheta(g, p, o.cores.c1, o.cores.c2) });
-  for (const b of campo.bolas) lista.push({ y: b.y + (b.z > 2 ? 400 : 0), f: () => desenhaBola(g, b, o.cores.c1) });
+  campo.bolas.forEach((b, i) => lista.push({ y: b.y + (b.z > 2 ? 400 : 0), f: () => desenhaBola(g, b, o.cores.c1, i > 0) }));
   if (o.lancador !== undefined) lista.push({ y: 770, f: () => { const d = o.lancador! * 16; g.muro(368, 748 + d, 386, 748 + d, 6, '#c9cee6', 5); g.linha([[377, 752 + d, 3], [377, 790, 3]], '#8088aa', 3); } });
   lista.sort((a, b) => a.y - b.y);
   for (const i of lista) i.f();

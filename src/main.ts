@@ -55,9 +55,9 @@ function carrega(d: MachineDef, m: ModoJogo, atracao = false) {
   caixa.carrega(d); fundoChave = '';
   J = new Game(d, m, atracao ? 0 : salvo.mestria(d.id), (Date.now() % 100000) + 1);
   // tablado autoral da máquina (cena + acabamento), lendo as posições reais das peças já montadas
-  texMesa = texturaMesa(d, J); subDe = null; aplicaVisual(pintor, d.id);
+  texMesa = texturaMesa(d, J); subDe = null; aplicaVisual(pintor, d.id); pintor.fundoLum = (texMesa as any).lum || null;
   const vis = visualDe(d.id); ambiente = new Ambiente(vis.ambiente, d.paleta, toque ? 18 : 30); ambiente.reduzido = reduz;
-  fxv = new EfeitosVisuais(vis.choque, vis.particula, d.paleta, d.assinatura.tipo); fxv.pecas = () => J?.mesa.pecas || []; fxv.reduzido = reduz; fxv.maxPs = toque ? 40 : 70; miniCarta = null;
+  fxv = new EfeitosVisuais(vis.choque, vis.particula, d.paleta, d.assinatura.tipo); fxv.pecas = () => J?.mesa.pecas || []; fxv.jogo = () => J; fxv.reduzido = reduz; fxv.maxPs = toque ? 40 : 70; miniCarta = null;
   { const ev0 = J.ev.bind(J), Jv = J, fx = fxv; Jv.ev = (tp, b, dd) => { ev0(tp, b, dd); try { fx.observa(tp, b, dd, Jv.m.chefe); } catch { /* a apresentação nunca derruba o jogo */ } }; }
   (J as any).ranking = salvo.ranking(d.id);
   J.saidaSom = atracao ? null : (n, p) => audio.toca(n, p); J.saidaFala = atracao ? null : s => audio.fala(s);
@@ -106,7 +106,7 @@ function passo(dt: number) {
   acum = Math.min(acum + dt, DT * 8);
   while (acum >= DT) { robo?.passo(DT); J.update(DT); acum -= DT; }
   if (estado === 'atracao' && J.estado === 'fim') { estado = 'menu'; J = null; ui.menu(); return; }
-  efeitos.recebe(J.fxs); efeitos.passo(dt); apres.observa(J.anuncios, J.cores); for (const a of J.anuncios) registraAnuncio(J, a.tipo, a.texto); caixa.recebe(J.anuncios); caixa.passo(dt);
+  efeitos.recebe(J.fxs); efeitos.passo(dt); apres.observa(J.anuncios, J.cores); for (const a of J.anuncios) { registraAnuncio(J, a.tipo, a.texto); if (a.tipo.startsWith('missao')) painelT = -1; if ((a.tipo === 'assinatura' || a.tipo === 'assinaturaTotal') && fxv) { const b = J.campo.bolas[0]; fxv.assinou(b?.x ?? 190, b?.y ?? 400, a.tipo === 'assinaturaTotal'); } } caixa.recebe(J.anuncios); caixa.passo(dt);
   apres.passo(dt); fxv?.passo(dt); if (ambiente) { ambiente.forca = (J.mago ? 2 : J.multibola ? 1.4 : 1) * (qualidade >= 2 ? 0.6 : 1); ambiente.leve = qualidade >= 2; ambiente.passo(dt); }
   audio.nivel = J.mago ? 4 : J.multibola ? 3 : J.intensidade > 0.3 || J.sub ? 2 : 1; audio.progressao = J.sub ? 1 : 0;
 }
@@ -149,7 +149,9 @@ function desenha() {
     const cam = misturaCam(CAM_MESA, CAM_ANDAR, cm);
     // sombra projetada sobre a mesa principal
     c.fillStyle = `rgba(0,0,0,${0.4 * d * (1 - cm)})`; c.beginPath(); c.ellipse(v.ox + W * v.s / 2, v.oy + H * v.s * (0.35 + 0.3 * d), W * v.s * 0.5, H * v.s * 0.2, 0, 0, Math.PI * 2); c.fill();
+    const lumMesa = pintor.fundoLum; pintor.fundoLum = null;
     desenhaCampo(pintor, S.campo, vs, cam, { id: 'sub', tex: texSub!, cores: k, passo: cm > 0 && cm < 1 ? 8 : 0, semBase: S.rolagem });
+    pintor.fundoLum = lumMesa;
     if (!T) { efeitos.desenha(pintor); fxv?.desenha(pintor); }
   }
   if (!efeitos.semBloom) efeitos.compoeBloom(c, w, h);
@@ -250,6 +252,8 @@ if (import.meta.env.DEV) {
     enterArena: (tipo: string) => { if (!J) return false; const b = J.mesa.bolas[0] || J.novaNaCanaleta(); J.estado = 'jogo'; J.iniciaTrans(criaArena(J, tipo), b, J.m.portal); return !!J.sub; },
     mago: () => J?.iniciaMago(),
     pulaIntro: () => apres.encerra(),
+    /** entra no modo de atração já (teste de regressão do erro 'reading def') */
+    atracao: () => { ui.fecha(); carrega(MAQUINAS[0], 'normal', true); ui.atracao(); return estado; },
     /** Visual R04: desenha um quadro já (com o laço parado) e diz onde a bola 0 está na tela, em pixels do canvas */
     desenhaJa: () => desenha(),
     bolaNaTela: () => { const b = J?.mesa.bolas[0]; if (!b) return null; pintor.mira(Q.mesa, CAM_MESA, J!.mesa.camY); const [X, Y, K] = pintor.p(b.x, b.y, 7 + b.z); return { x: X * dpr, y: Y * dpr, r: b.r * K * dpr }; },

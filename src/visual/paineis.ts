@@ -8,6 +8,7 @@ import { relogio } from '../render/backbox';
 import type { Ret } from '../render/cabinet';
 import { rr } from '../render/cabinet';
 import { alfa } from './pincel';
+import { estadoMissao } from './estado';
 
 type Ctx = CanvasRenderingContext2D;
 const F = (peso: number, px: number) => `${peso} ${px}px Orbitron, sans-serif`;
@@ -84,16 +85,16 @@ export function painelDireito(c0: Ctx, r: Ret, J: Game, def: MachineDef, eterno:
     c.textAlign = 'right'; c.fillStyle = k.c2; c.fillText('BÔNUS ' + J.bonusX + 'X', x + w, E.y); c.textAlign = 'left'; E.pula(base * 0.72 * 1.4);
     E.t('nível ' + J.nivel + (eterno ? ' · degrau ' + (J.degrau + 1) + ' · recorde ' + relogio(eterno.tempo) : '') + ' · travas ' + J.travas + ' de 2', '#aab2d8', 500, 0.46);
     E.pula(8);
-    const ativa = J.missoes[J.missaoAtiva], by = E.y, bh0 = ativa ? base * 2.9 : base * 2.1;
+    const M = estadoMissao(J), ativa = M.ativa ? M : null, by = E.y, bh0 = ativa ? base * 2.9 : base * 2.1;
     rr(c, x - 6, by - 4, w + 12, bh0, 9); c.fillStyle = ativa ? alfa(k.c1, 0.1) : 'rgba(255,255,255,0.03)'; c.fill(); c.strokeStyle = alfa(ativa ? k.c1 : '#8a92b8', 0.35); c.lineWidth = 1; c.stroke();
     E.y = by + 4;
     if (ativa) {
       E.rotulo('MISSÃO ATIVA', k.c1); E.t(ativa.nome.toUpperCase(), '#ffffff', 800, 0.6);
       const y = E.y + 2, bw = w - base * 3.6; c.fillStyle = '#1a1e38'; rr(c, x, y, bw, 7, 3.5); c.fill(); c.fillStyle = k.c1; rr(c, x, y, bw * Math.min(1, ativa.n / ativa.meta), 7, 3.5); c.fill();
-      c.font = F(700, Math.round(base * 0.48)); c.textAlign = 'right'; c.fillStyle = J.missaoT < 10 ? '#ff5577' : '#e8ecff'; c.fillText(ativa.n + '/' + ativa.meta + ' · ' + Math.ceil(J.missaoT) + 's', x + w, y - 3); c.textAlign = 'left';
-    } else { E.rotulo('MISSÃO', '#8a92b8'); E.t(J.missoes.every(m => m.feita) ? 'todas cumpridas neste ciclo' : 'o PORTAL inicia a próxima', '#c9d0f5', 600, 0.5); }
+      c.font = F(700, Math.round(base * 0.48)); c.textAlign = 'right'; c.fillStyle = ativa.tempo < 10 ? '#ff5577' : '#e8ecff'; c.fillText(ativa.n + '/' + ativa.meta + ' · ' + ativa.tempo + 's', x + w, y - 3); c.textAlign = 'left';
+    } else { E.rotulo('MISSÃO', '#8a92b8'); E.t(M.todas ? 'todas cumpridas neste ciclo' : 'próxima: ' + M.proxima + ' · o PORTAL inicia', '#c9d0f5', 600, 0.5); }
     E.y = by + bh0 + 10;
-    E.rotulo('MISSÕES · ' + J.missoes.filter(m => m.feita).length + ' DE ' + J.missoes.length, k.c2);
+    E.rotulo('MISSÕES · ' + M.feitas + ' DE ' + M.total, k.c2);
     J.missoes.forEach((m, i) => E.t((m.feita ? '✔ ' : i === J.missaoAtiva ? '▶ ' : '· ') + m.nome, m.feita ? k.c1 : i === J.missaoAtiva ? '#ffffff' : '#8a92b8', i === J.missaoAtiva ? 700 : 500, 0.5));
     E.pula(8); E.rotulo('EVOLUÇÕES', k.c2); E.t(J.nomesEvolucoes.join(' · ') || 'nenhuma ainda', '#cdd3f5', 500, 0.48);
     E.pula(8); E.rotulo('RECORDES DESTA MÁQUINA', k.c2);

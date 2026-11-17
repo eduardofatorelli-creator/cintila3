@@ -29,9 +29,16 @@ export function infoMesa(J: Game): InfoMesa {
 export function texturaMesa(d: MachineDef, J: Game, escala = 2): HTMLCanvasElement {
   const [t, c] = novaTela(W, H, escala), cena = CENAS[d.id], v = visualDe(d.id), p = new Pincel(c, d.paleta, W, H);
   const sk = skinDe(d.id);
-  if (sk) { try { sk.tablado(p, infoMesa(J)); return t; } catch (e) { console.warn(e); } }
+  if (sk) { try { sk.tablado(p, infoMesa(J)); return comLuminancia(t); } catch (e) { console.warn(e); } }
   try { if (cena) cena(p, infoMesa(J)); else d.arte(c, new Tema(c, d.paleta, W, H)); } catch (e) { console.warn(e); d.arte(c, new Tema(c, d.paleta, W, H)); }
   acabamento(p, infoMesa(J), v.luz);
+  return t;
+}
+
+/** mapa de luminância do tablado (40×76), usado para o contraste adaptativo da bola */
+export function comLuminancia(t: HTMLCanvasElement): HTMLCanvasElement {
+  try { const cv = document.createElement('canvas'); cv.width = 40; cv.height = 76; const g = cv.getContext('2d', { willReadFrequently: true })!; g.drawImage(t, 0, 0, 40, 76); const d = g.getImageData(0, 0, 40, 76).data, L = new Float32Array(40 * 76);
+    for (let i = 0; i < L.length; i++) L[i] = (0.2126 * d[i * 4] + 0.7152 * d[i * 4 + 1] + 0.0722 * d[i * 4 + 2]) / 255; (t as any).lum = L; } catch { /* sem leitura de pixels: contraste padrão */ }
   return t;
 }
 
