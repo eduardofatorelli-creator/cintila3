@@ -1,11 +1,14 @@
 // Progresso salvo em localStorage, uma chave por item, com try/catch em tudo.
-const P = 'cintila3.';
+import { PLAYTEST } from '../playtest';
+// playtest: prefixo próprio (o progresso dos testadores nunca se mistura ao oficial)
+const P = PLAYTEST ? 'cintila3.playtest.' : 'cintila3.';
 function ler<T>(k: string, padrao: T): T { try { const v = localStorage.getItem(P + k); return v === null ? padrao : JSON.parse(v) as T; } catch { return padrao; } }
 function gravar(k: string, v: unknown) { try { localStorage.setItem(P + k, JSON.stringify(v)); } catch { /* armazenamento indisponível */ } }
 
 export interface Prefs { som: boolean; musica: boolean; narrador: boolean; canhoto: boolean; curtas: boolean }
 export const salvo = {
-  desbloqueadas: () => Math.max(1, ler('desbloqueadas', 1)),
+  /** playtest: as 30 aparecem liberadas sem gravar nada no progresso */
+  desbloqueadas: () => (PLAYTEST ? 30 : Math.max(1, ler('desbloqueadas', 1))),
   desbloqueia(n: number) { if (n > this.desbloqueadas()) gravar('desbloqueadas', n); },
   recorde: (id: string) => ler<number>('recorde.' + id, 0),
   ranking: (id: string) => ler<number[]>('ranking.' + id, []),

@@ -7,6 +7,7 @@ import type { Game, ModoJogo } from './game/rules';
 import { MAQUINAS } from './machines';
 import type { MachineDef } from './machines/_schema';
 import { visualDe } from './visual/manifesto';
+import { PLAYTEST, RECURSOS, VERSAO } from './playtest';
 
 const CSS = `
 #ui *{box-sizing:border-box}
@@ -77,11 +78,14 @@ const CSS = `
 .brilho{background:linear-gradient(90deg,#ffd24a,#fff,#ffd24a);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:corre 2.5s linear infinite}
 @media (prefers-reduced-motion: reduce){#ui *{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition:none!important}.festa{display:none}}
 .toque{position:absolute;inset:0;pointer-events:none}
+.teste{position:relative;max-width:1100px;margin:0 auto 14px;border:1px solid rgba(255,210,74,.5);background:rgba(255,210,74,.08);border-radius:12px;padding:10px 14px;font-size:12px;line-height:1.6;color:#ffe2a0}.teste b{color:#ffd24a}.teste ol{margin:4px 0 0;padding-left:18px;color:#e8ecff}
+.bt.lab{border-color:#ffd24a;color:#ffd24a}.labs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin:10px 0}.labs .bt{text-align:left;font-size:12px;letter-spacing:.06em;line-height:1.35}.labs .bt small{display:block;font:500 11px system-ui,sans-serif;color:#aab2d8;letter-spacing:0;margin-top:2px}
+.versao{position:relative;text-align:center;font-size:10px;color:#6a729a;margin-top:18px}
 .cartao .nome .num{display:inline-block;font:800 10px Orbitron;color:#05060f;background:linear-gradient(180deg,#fff,#b9c0d8);border-radius:4px;padding:1px 5px;margin-right:5px;vertical-align:1px}
 @media(max-width:560px){.sub{letter-spacing:.22em}.conceito{display:none}.fichas{grid-template-columns:1fr 1fr;gap:6px}.ficha span{font-size:11px}.vitrine .linha .bt{flex:1;padding:12px 10px}.bt.forte{font-size:15px}.vitrine h2{font-size:20px}.lema{font-size:12px}}
 `;
 
-interface Acoes { jogar(id: string, modo: ModoJogo): void; menu(): void; continuar(): void; prefs(p: Prefs): void; som(): void; vidro(d: MachineDef): HTMLCanvasElement[] }
+interface Acoes { jogar(id: string, modo: ModoJogo): void; menu(): void; continuar(): void; prefs(p: Prefs): void; som(): void; vidro(d: MachineDef): HTMLCanvasElement[]; demo(id: string, recurso: string): void; recurso(r: string): void; emDemo(): boolean }
 const el = (tag: string, cls = '', html = '') => { const e = document.createElement(tag); if (cls) e.className = cls; if (html) e.innerHTML = html; return e; };
 const num = (n: number) => Math.round(n).toLocaleString('pt-BR');
 const tempo = (s: number) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
@@ -119,6 +123,10 @@ export class Interface {
   menu() {
     this.fecha(); this.A.menu(); this.fila = [];
     const p = el('div', 'painel'); p.append(el('h1', 'titulo', 'CINTILA 3'), el('div', 'sub', 'PINBALL DE ATAQUE · 30 MÁQUINAS'));
+    if (PLAYTEST) p.append(el('div', 'teste', `<b>VERSÃO DE TESTES · AS 30 MÁQUINAS ESTÃO LIBERADAS.</b> Seus recordes ficam só neste aparelho.
+      <ol><li>Escolha uma máquina na galeria e toque em <b>▶ JOGAR</b> (partida normal, sem atalhos).</li><li>Lançar: segure <b>Espaço</b> e solte; no celular, segure a metade direita da tela e solte.</li>
+      <li>Palhetas: <b>Z</b> e <b>M</b> (ou ← →); no celular, toque nas metades esquerda e direita.</li><li>Pausar: <b>P</b> ou o botão ❚❚ no canto; da pausa você volta à galeria.</li>
+      <li><b>🧪 TESTAR RECURSOS</b> abre chefes, modo mago, multibola e fases especiais na hora. Essas partidas são de demonstração e não contam para recordes.</li></ol>`));
     const abas = el('div', 'abas');
     for (const [id, nome] of [['mapa', 'MÁQUINAS'], ['recordes', 'RECORDES'], ['opcoes', 'OPÇÕES']] as const) abas.append(this.botao(nome, () => { this.aba = id; this.menu(); }, this.aba === id ? 'on' : ''));
     p.append(abas);
@@ -127,7 +135,7 @@ export class Interface {
   }
   private mapa(p: HTMLElement) {
     const livres = salvo.desbloqueadas();
-    if (!this.sel || !MAQUINAS.some(m => m.id === this.sel && m.n <= livres)) this.sel = MAQUINAS[Math.min(livres, MAQUINAS.length) - 1].id;
+    if (!this.sel || !MAQUINAS.some(m => m.id === this.sel && m.n <= livres)) this.sel = PLAYTEST ? MAQUINAS[0].id : MAQUINAS[Math.min(livres, MAQUINAS.length) - 1].id;
     const d = MAQUINAS.find(m => m.id === this.sel)!, et = salvo.eterno(d.id), vit = el('section', 'vitrine'), dentro = el('div'), arte = el('div', 'arte'), info = el('div');
     vit.setAttribute('aria-label', 'Máquina selecionada: ' + d.nome); cores(vit, d);
     arte.append(this.miniatura(d), el('span', 'placa', String(d.n).padStart(2, '0')));
@@ -136,6 +144,7 @@ export class Interface {
       <div class="fichas">${ficha('ASSINATURA · ' + d.assinatura.nome.toUpperCase(), d.assinatura.dica)}${ficha('CHEFE', d.chefe.nome)}${ficha('ANDAR DE CIMA', d.andar.nome)}${ficha('MODO MAGO', d.mago.nome)}</div>
       <p class="recs"><span style="color:#ffd24a;letter-spacing:1px">${estrelas(salvo.mestria(d.id))}</span> · recorde ${num(salvo.recorde(d.id))}${et.tempo ? ' · eterno ' + tempo(et.tempo) : ''}</p>`;
     const l = el('div', 'linha'); l.append(this.botao('▶ JOGAR', () => { this.fecha(); this.A.jogar(d.id, 'normal'); }, 'forte'), this.botao('∞ MODO ETERNO', () => { this.fecha(); this.A.jogar(d.id, 'eterno'); }));
+    if (PLAYTEST) l.append(this.botao('🧪 TESTAR RECURSOS', () => this.laboratorio(d), 'lab'));
     info.append(l); dentro.append(arte, info); vit.append(dentro); p.append(vit);
     const g = el('div', 'grade');
     for (const m of MAQUINAS) {
@@ -149,7 +158,8 @@ export class Interface {
       if (!tr) c.onclick = () => { this.A.som(); if (this.sel === m.id) { this.fecha(); this.A.jogar(m.id, 'normal'); } else { this.sel = m.id; this.menu(); } };
       g.append(c);
     }
-    p.append(g, el('p', 'dica', 'VENÇA O MODO MAGO DE UMA MÁQUINA PARA LIBERAR A PRÓXIMA'));
+    p.append(g, el('p', 'dica', PLAYTEST ? 'VERSÃO DE TESTES: TODAS AS MÁQUINAS LIBERADAS' : 'VENÇA O MODO MAGO DE UMA MÁQUINA PARA LIBERAR A PRÓXIMA'));
+    if (PLAYTEST) p.append(el('p', 'versao', 'Cintila 3 · playtest R06.2 · build ' + VERSAO));
   }
   private recordes(p: HTMLElement) {
     const cx = el('div', 'caixa'); cx.style.margin = '0 auto'; cx.style.maxWidth = '760px';
@@ -168,11 +178,39 @@ export class Interface {
     (cx.lastChild as HTMLElement).style.fontSize = '11px'; (cx.lastChild as HTMLElement).style.lineHeight = '1.7'; p.append(cx);
   }
 
+  /** laboratório (só no playtest): cada botão abre uma partida de demonstração já no estado pedido */
+  laboratorio(d: MachineDef) {
+    this.fecha(); const v = el('div', 'painel vidro'), cx = el('div', 'caixa'); cx.style.maxWidth = '760px';
+    cx.innerHTML = `<h2 style="color:${d.paleta.c1}">🧪 TESTAR RECURSOS · ${d.n}. ${d.nome.toUpperCase()}</h2><p class="fraco">Partida de demonstração: começa já no estado escolhido, usando as regras reais. Não conta para recordes nem para o progresso.</p>`
+      + (d.id === 'relampago' ? '<p class="aviso">O Relâmpago sorteia seis poderes por partida. Os nomes aparecem nos selos em volta do chefe, no painel ao lado da mesa e na pausa.</p>' : '')
+      + `<p class="fraco"><b>Mecânica-assinatura (${d.assinatura.nome}):</b> ${d.assinatura.dica}. Ela acontece jogando; use "Só jogar" para experimentar.</p>`;
+    const g = el('div', 'labs');
+    for (const r of [{ id: 'jogar', nome: 'Só jogar (demonstração)', desc: 'Partida de demonstração sem atalho' }, ...RECURSOS]) { const b = this.botao(r.nome, () => { this.fecha(); this.A.demo(d.id, r.id); }); b.innerHTML = r.nome + '<small>' + r.desc + '</small>'; g.append(b); }
+    const l = el('div', 'linha'); l.style.justifyContent = 'center'; l.append(this.botao('VOLTAR À GALERIA', () => this.menu()));
+    cx.append(g, l); v.append(cx); this.raiz.append(v);
+  }
+  /** fim de uma partida de demonstração: não grava nada */
+  fimDemo(J: Game) {
+    this.fecha(); const v = el('div', 'painel vidro'), cx = el('div', 'caixa');
+    cx.innerHTML = `<h2>FIM DA DEMONSTRAÇÃO</h2><div class="fraco">${J.def.nome}</div><div class="placar">${num(J.pontos)}</div><p class="fraco">Partidas de demonstração não contam para recordes nem para o progresso.</p>`;
+    const l = el('div', 'linha'); l.style.justifyContent = 'center';
+    l.append(this.botao('🧪 OUTRO RECURSO', () => this.laboratorio(J.def), 'forte'), this.botao('VOLTAR À GALERIA', () => this.menu())); cx.append(l); v.append(cx); this.raiz.append(v);
+  }
+
   pausa(J: Game) {
     this.fecha(); const v = el('div', 'painel vidro'), cx = el('div', 'caixa');
     cx.innerHTML = `<h2>PAUSA</h2><p class="fraco">${J.def.nome} · ${num(J.pontos)} pontos</p><p><b>Evoluções conquistadas</b></p><p>${J.nomesEvolucoes.join('<br>') || '<span class="fraco">nenhuma ainda</span>'}</p>`;
     const l = el('div', 'linha'); l.style.justifyContent = 'center';
-    l.append(this.botao('CONTINUAR', () => { this.fecha(); this.A.continuar(); }, 'forte'), this.botao('SAIR PARA O MAPA', () => this.menu())); cx.append(l); v.append(cx); this.raiz.append(v);
+    l.append(this.botao('CONTINUAR', () => { this.fecha(); this.A.continuar(); }, 'forte'), this.botao('SAIR PARA O MAPA', () => this.menu())); cx.append(l);
+    const pod = (J.sigs?.[0] as any)?.poderes as string[] | undefined; if (pod?.length) cx.append(el('p', 'aviso', 'Poderes sorteados nesta partida: ' + pod.join(' · ').toUpperCase()));
+    if (PLAYTEST) {
+      // som (música, efeitos, narrador) direto da pausa
+      const pr = salvo.prefs(), sl = el('div', 'linha'); sl.style.justifyContent = 'center';
+      for (const [rot, k] of [['MÚSICA', 'musica'], ['EFEITOS', 'som'], ['NARRADOR', 'narrador']] as [string, keyof Prefs][]) sl.append(this.botao(rot + ': ' + (pr[k] ? 'SIM' : 'NÃO'), () => { pr[k] = !pr[k]; this.A.prefs(pr); this.pausa(J); }, pr[k] ? 'on' : ''));
+      cx.append(sl);
+      if (this.A.emDemo()) { cx.append(el('p', 'fraco', '🧪 Demonstração: aplicar outro recurso nesta mesma partida')); const g = el('div', 'labs'); for (const r of RECURSOS) { const b = this.botao(r.nome, () => { this.fecha(); this.A.continuar(); this.A.recurso(r.id); }); b.innerHTML = r.nome + '<small>' + r.desc + '</small>'; g.append(b); } cx.append(g); cx.style.maxWidth = '760px'; }
+    }
+    v.append(cx); this.raiz.append(v);
   }
 
   fim(J: Game, f: Fecho) {

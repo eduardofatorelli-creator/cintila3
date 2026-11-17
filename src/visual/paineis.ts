@@ -52,6 +52,7 @@ export function painelEsquerdo(c: Ctx, r: Ret, J: Game, def: MachineDef, _mini: 
     const ch = J.m.chefe, ultima = ch.vida === 1 && !ch.c.off;
     const bloco = (rot: string, cor: string, nome: string, extra?: () => void) => { E.rotulo(rot, cor); E.t(nome, '#ffffff', 700, 0.56); extra?.(); E.pula(6); };
     bloco('ASSINATURA', k.c2, def.assinatura.nome, () => E.t(def.assinatura.dica, '#aab2d8', 500, 0.47));
+    const pod = (J.sigs?.[0] as any)?.poderes as string[] | undefined; if (pod?.length) bloco('PODERES DESTA PARTIDA', '#fff36b', pod.join(' · ').toUpperCase());
     bloco('CHEFE', ultima ? '#ff5a72' : k.c2, def.chefe.nome, () => {
       const y = E.y + 2; if (!seco) for (let i = 0; i < Math.min(8, Math.max(0, ch.vida)); i++) { c.fillStyle = i === 0 && ultima && Math.floor(t * 4) % 2 ? '#ffffff' : '#ff4466'; rr(c, x + i * 15, y, 11, 7, 3); c.fill(); }
       E.pula(13); if (ch.c.off) E.t('derrubado · volta em instantes', '#aab2d8', 500, 0.45);

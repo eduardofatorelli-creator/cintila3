@@ -17,6 +17,7 @@ import { Efeitos } from './render/effects';
 import { Pintor, desenhaCampo, pintaBase, semEtapa } from './render/playfield';
 import { Tema, novaTela } from './render/tema';
 import { Interface } from './ui';
+import { PLAYTEST } from './playtest';
 import { aplicaVisual, movimentoReduzido, texturaAndar, texturaMesa } from './visual';
 import { Ambiente } from './visual/ambiente';
 import { Apresentacao } from './visual/apresentacao';
@@ -59,7 +60,10 @@ function ajusta() {
 }
 addEventListener('resize', ajusta); ajusta();
 
-function carrega(d: MachineDef, m: ModoJogo, atracao = false) {
+/** partida de demonstração do laboratório (só playtest): não grava recorde, mestria, partidas nem desbloqueio */
+let demo = false;
+function carrega(d: MachineDef, m: ModoJogo, atracao = false, emDemo = false) {
+  demo = emDemo;
   def = d; modo = m;
   caixa.carrega(d); fundoChave = '';
   J = new Game(d, m, atracao ? 0 : salvo.mestria(d.id), (Date.now() % 100000) + 1);
@@ -71,9 +75,9 @@ function carrega(d: MachineDef, m: ModoJogo, atracao = false) {
   (J as any).ranking = salvo.ranking(d.id);
   J.saidaSom = atracao ? null : (n, p) => audio.toca(n, p); J.saidaFala = atracao ? null : s => audio.fala(s);
   liberou = 0; primeiraBola = !atracao;
-  J.aoVencerMago = g => { if (!atracao) liberou = libera(g) || liberou; };
-  J.aoAtalho = g => { if (!atracao) liberou = libera(g) || liberou; };
-  J.aoFim = g => { if (atracao) return; const f = fecha(g, liberou); (g as any).ranking = salvo.ranking(d.id); estado = 'fim'; setTimeout(() => ui.fim(g, f), 2600); };
+  J.aoVencerMago = g => { if (!atracao && !demo) liberou = libera(g) || liberou; };
+  J.aoAtalho = g => { if (!atracao && !demo) liberou = libera(g) || liberou; };
+  J.aoFim = g => { if (atracao) return; if (demo) { estado = 'fim'; setTimeout(() => ui.fimDemo(g), 2600); return; } const f = fecha(g, liberou); (g as any).ranking = salvo.ranking(d.id); estado = 'fim'; setTimeout(() => ui.fim(g, f), 2600); };
   robo = atracao ? new Robo(J, Math.random, 0.85) : null;
   audio.tema(d.bpm, d.escala, d.raiz); if (!atracao) audio.liga(); else audio.desliga();
   estado = atracao ? 'atracao' : 'jogo'; acum = 0; efeitos.ps.length = 0;
@@ -87,6 +91,9 @@ const ui = new Interface({
   prefs: p => { prefs = p; audio.som = p.som; audio.musica = p.musica; audio.narrador = p.narrador; apres.curtas = p.curtas; salvo.gravaPrefs(p); },
   som: () => { audio.inicia(); audio.toca('faixa'); },
   vidro: d => Backbox.vidro(d, 400, 228, 0.6),
+  demo: (id, r) => { if (!PLAYTEST) return; audio.inicia(); carrega(porId(id), 'normal', false, true); apres.encerra(); if (r !== 'jogar') demonstra(r); },
+  recurso: r => { if (PLAYTEST && demo) demonstra(r); },
+  emDemo: () => demo,
 });
 
 ligaEntrada(tela, {
@@ -203,6 +210,34 @@ function paineis() {
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
+/** laboratório: leva a partida de demonstração ao estado pedido usando métodos reais do jogo */
+function demonstra(r: string) {
+  if (!J || !demo) return; const G = J as any;
+  if (J.escolha) J.escolher(J.escolha.i);
+  if (J.bolaNaCanaleta() || J.estado === 'lancar') { J.lancar(0.95); primeiraBola = false; }
+  J.estado = 'jogo'; const b = J.campo.bolas[0] || J.novaNaCanaleta(), naMesa = !J.sub && !J.trans;
+  switch (r) {
+    case 'chefao': case 'bonus': case 'premium': case 'tunel': if (naMesa && !J.mago) J.sobe(b, J.m.portal, r as any); break;
+    case 'nucleo': case 'enxame': case 'muralha': case 'camara': if (naMesa && !J.mago) J.iniciaTrans(criaArena(J, r), b, r === 'camara' ? J.m.trava : J.m.portal); break;
+    case 'mago': if (naMesa && !J.mago) J.iniciaMago(); break;
+    case 'chefeFase': if (naMesa && !J.m.chefe.c.off) J.derrubaFase(b, 1); break;
+    case 'chefeUltima': if (!J.m.chefe.c.off) J.m.chefe.vida = 1; break;
+    case 'multibola': if (naMesa && !J.multibola) { G.trava(b); G.trava(b); } break;
+    case 'jackpot': if (naMesa) { if (!J.multibola) { G.trava(b); G.trava(b); } G.jackpot(b); } break;
+    case 'super': if (naMesa) { if (!J.multibola) { G.trava(b); G.trava(b); } while (!J.superAceso) G.jackpot(b); J.m.chefe.imune = 0; if (!J.m.chefe.c.off) J.ev('chefe', b, J.m.chefe); } break;
+    case 'andarAceso': J.acendeAndar(); break;
+  }
+}
+
+/** botão de pausa na tela (playtest: celular não tem tecla P) */
+const botaoPausa = PLAYTEST ? Object.assign(document.createElement('button'), { textContent: '❚❚', title: 'Pausar', ariaLabel: 'Pausar' }) : null;
+if (botaoPausa) {
+  botaoPausa.style.cssText = 'position:fixed;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));z-index:5;width:44px;height:44px;border-radius:10px;border:1.5px solid #3b4290;background:rgba(10,12,30,.8);color:#e8ecff;font:800 16px system-ui;display:none;touch-action:manipulation;cursor:pointer';
+  botaoPausa.onclick = e => { e.stopPropagation(); if (estado === 'jogo' && J) { estado = 'pausa'; ui.pausa(J); } };
+  botaoPausa.addEventListener('pointerdown', e => e.stopPropagation());
+  document.body.appendChild(botaoPausa);
+}
+
 /** junta as 3 camadas do backglass numa imagem só (cartão do painel esquerdo) */
 function compoe(cam: HTMLCanvasElement[]) { if (!cam.length) return null; const [t, x] = novaTela(cam[0].width, cam[0].height); for (const k of cam) x.drawImage(k, 0, 0); return t; }
 
@@ -240,6 +275,7 @@ function quadro(agora: number) {
   const dt = Math.min(0.05, (agora - ultimo) / 1000 || 0); ultimo = agora;
   // qualidade adaptativa: se o quadro passa de 20 ms por um tempo, corta partículas, depois bloom e resolução
   if (estado === 'jogo' || estado === 'atracao') { if (dt > 0.021) lento += dt; else { lento = Math.max(0, lento - dt * 0.5); folga += dt; } if (lento > 1.5 && qualidade < 3) { qualidade++; lento = 0; folga = 0; efeitos.max = [300, 110, 60, 40][qualidade]; efeitos.simples = qualidade >= 2; if (qualidade >= 3) efeitos.semBloom = true; ajusta(); } }
+  if (botaoPausa) { const v = estado === 'jogo' ? 'block' : 'none'; if (botaoPausa.style.display !== v) botaoPausa.style.display = v; }
   if (rodando) { passo(dt); desenha(); requestAnimationFrame(quadro); }
 }
 
@@ -256,6 +292,9 @@ if (import.meta.env.DEV) {
     step: (dt = DT) => { J?.update(dt); },
     stopLoop: () => { rodando = false; },
     loadMachine: (id: string, m: ModoJogo = 'normal') => { ui.fecha(); carrega(porId(id), m); return !!J; },
+    get demo() { return demo; },
+    /** laboratório (teste): abre a máquina em demonstração já no recurso pedido */
+    demoJa: (id: string, r: string) => { ui.fecha(); carrega(porId(id), 'normal', false, true); apres.encerra(); if (r !== 'jogar') demonstra(r); return !!J; },
     grantUpgrade: () => J?.evolui(),
     enterUpper: (tipo?: any) => { if (!J) return false; const b = J.mesa.bolas[0] || J.novaNaCanaleta(); J.estado = 'jogo'; J.sobe(b, J.m.portal, tipo); return !!J.sub; },
     enterArena: (tipo: string) => { if (!J) return false; const b = J.mesa.bolas[0] || J.novaNaCanaleta(); J.estado = 'jogo'; J.iniciaTrans(criaArena(J, tipo), b, J.m.portal); return !!J.sub; },
