@@ -68,8 +68,9 @@ export class Apresentacao {
     const h = base - topo; if (h < 26) return;
     const u = L.t / L.dur, ent = suave(L.t / 0.25), sai = 1 - suave((L.t - (L.dur - 0.3)) / 0.3), a = Math.min(ent, sai), cy = topo + h / 2;
     c.save(); c.beginPath(); c.rect(r.x + m, topo, r.w - m * 2, h); c.clip();
-    c.globalAlpha = a * 0.78; c.fillStyle = '#03040c'; c.fillRect(r.x + m, cy - h * 0.36 * ent, r.w - m * 2, h * 0.72 * ent);
-    c.globalAlpha = a; c.fillStyle = L.cor; c.fillRect(r.x + m, cy - h * 0.36 * ent, r.w - m * 2, 2); c.fillRect(r.x + m, cy + h * 0.36 * ent - 2, r.w - m * 2, 2);
+    // faixa opaca sobre toda a área da arte: o letreiro nunca se mistura ao título do backglass
+    c.globalAlpha = a * 0.94; c.fillStyle = '#03040c'; c.fillRect(r.x + m, cy - h * 0.5 * ent, r.w - m * 2, h * ent);
+    c.globalAlpha = a; c.fillStyle = L.cor; c.fillRect(r.x + m, cy - h * 0.5 * ent, r.w - m * 2, 2); c.fillRect(r.x + m, cy + h * 0.5 * ent - 2, r.w - m * 2, 2);
     const tam = Math.min(h * 0.36, r.w / Math.max(8, L.titulo.length) * 1.25);
     c.font = `800 ${tam}px Orbitron, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
     const x = r.x + r.w / 2 + (1 - ent) * r.w * 0.3, y = cy - (L.sub ? tam * 0.3 : 0);

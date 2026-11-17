@@ -5,6 +5,9 @@ import type { Gfx } from '../game/tipos';
 import { novaTela } from './tema';
 import { MATERIAIS, type Insert, type Material } from '../visual/manifesto';
 import { tom } from '../visual/pincel';
+import type { Skin } from '../visual/r05/skin';
+import { inserto, poe } from '../visual/r05/sprites';
+import type { Game } from '../game/rules';
 
 type Ctx = CanvasRenderingContext2D;
 const TAU = Math.PI * 2;
@@ -16,6 +19,8 @@ export class Pintor implements Gfx {
   bloom: Ctx | null = null; bs = 0.5; semBrilho = false;
   /** Visual R04: material, forma dos insertos e luz da máquina atual */
   mat: Material = MATERIAIS.cromo; insert: Insert = 'redondo'; luzCor = '#7df9ff';
+  /** R05: skin da máquina (desenho de peças por sprite); null mantém o desenho R04 */
+  skin: Skin | null = null;
   private grads = new Map<string, CanvasGradient>();
   constructor(public c: Ctx) {}
   /** gradiente de corpo cilíndrico em coordenadas locais (centro em 0), guardado por cor e raio */
@@ -78,6 +83,13 @@ export class Pintor implements Gfx {
   }
   luz(x: number, y: number, r: number, cor: string, on: number, rot?: string) {
     const [X, Y, K] = this.p(x, y, 0), c = this.c, R = r * K;
+    // R05: insertos em sprite (vidro facetado, aro, halo) quando a máquina tem skin
+    if (this.skin) {
+      const f = this.insert, fn = (cc: Ctx, RR: number) => formaInsert(cc, f, RR);
+      poe(c, inserto(f, fn, cor, R, false), X, Y); if (on > 0.05) poe(c, inserto(f, fn, cor, R, true), X, Y, Math.min(1, on));
+      if (rot && K > 0.55) { c.font = `700 ${Math.max(5, 5 * K)}px Orbitron, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'top'; c.fillStyle = on > 0.5 ? '#ffffff' : 'rgba(220,226,255,0.5)'; c.fillText(rot, X, Y + R * 1.3); }
+      return;
+    }
     // modo econômico (toque): só a lente na forma da máquina e o núcleo, sem moldura nem reflexo
     if (this.semBrilho) {
       c.save(); c.translate(X, Y); c.scale(1, 0.88); c.globalAlpha = Math.min(1, 0.16 + on * 0.84); c.fillStyle = cor; formaInsert(c, this.insert, R); c.fill();
@@ -122,6 +134,7 @@ export function deforma(c: Ctx, tex: HTMLCanvasElement, v: Vista, cam: Camera, p
 
 function paredes(g: Pintor, campo: Campo, fixas: boolean) {
   const segs = campo.segs.filter(s => !s.invisivel && !s.off && (fixas ? !s.dono || s.tipo === 'piso' : false));
+  if (g.skin) { g.skin.paredes(g, segs); return; }
   segs.sort((a, b) => Math.max(a.ay, a.by) - Math.max(b.ay, b.by));
   for (const s of segs) g.muro(s.ax, s.ay, s.bx, s.by, s.z ?? (s.tipo === 'piso' ? 4 : 12), s.cor || '#8890b8', s.tipo === 'porta' ? 2 : 3);
 }
@@ -130,22 +143,23 @@ interface Base { chave: string; tela: HTMLCanvasElement; mx: number; my: number 
 const bases = new Map<string, Base>();
 
 /** Camada parada: tablado deformado + paredes fixas. Refeita só quando a tela ou a máquina muda. */
-function camadaBase(id: string, campo: Campo, tex: HTMLCanvasElement, v: Vista, cam: Camera): Base {
-  const chave = `${id}|${v.s.toFixed(4)}|${cam.P}|${cam.CURVA}|${campo.segs.length}`;
+function camadaBase(id: string, campo: Campo, tex: HTMLCanvasElement, v: Vista, cam: Camera, skin: Skin | null = null): Base {
+  const chave = `${id}|${v.s.toFixed(4)}|${cam.P}|${cam.CURVA}|${campo.segs.length}|${skin ? 's' : ''}`;
   const velha = bases.get(id); if (velha && velha.chave === chave) return velha;
   const mx = 30 * v.s, my = 40 * v.s, [tela, c] = novaTela(W * v.s + mx * 2, H * v.s + my * 2);
   const vv = { ox: mx, oy: my, s: v.s };
   deforma(c, tex, vv, cam, 1);
-  const g = new Pintor(c); g.mira(vv, cam); paredes(g, campo, true);
+  const g = new Pintor(c); g.skin = skin; g.mira(vv, cam); paredes(g, campo, true);
   const b = { chave, tela, mx, my }; bases.set(id, b); if (bases.size > 6) bases.delete(bases.keys().next().value!);
   return b;
 }
 
 /** Pinta a camada parada da mesa num canvas qualquer (usado para montar o fundo pré-renderizado). */
-export function pintaBase(c: Ctx, id: string, campo: Campo, tex: HTMLCanvasElement, v: Vista, cam: Camera) { const b = camadaBase(id, campo, tex, v, cam); c.drawImage(b.tela, v.ox - b.mx, v.oy - b.my); }
+export function pintaBase(c: Ctx, id: string, campo: Campo, tex: HTMLCanvasElement, v: Vista, cam: Camera, skin: Skin | null = null) { const b = camadaBase(id, campo, tex, v, cam, skin); c.drawImage(b.tela, v.ox - b.mx, v.oy - b.my); }
 
 function palheta(g: Pintor, p: Palheta, c1: string, c2: string) {
-  const c = g.c, M = g.mat;
+  const c = g.c, M = g.skin ? { ...g.mat, borracha: g.skin.palheta.borracha } : g.mat;
+  if (g.skin) { c1 = g.skin.palheta.corpo; c2 = g.skin.palheta.base; }
   const casca = (z: number, esc: number) => {
     const a = g.p(p.px, p.py + (z === 0 ? 3 : 0), z), b = g.p(p.tx, p.ty + (z === 0 ? 3 : 0), z);
     const ang = Math.atan2(b[1] - a[1], b[0] - a[0]), r0 = p.r0 * a[2] * esc, r1 = p.r1 * b[2] * esc;
@@ -184,7 +198,7 @@ export function desenhaBola(g: Pintor, b: { x: number; y: number; z: number; r: 
 }
 
 export const semEtapa: Record<string, boolean> = {};
-export interface OpcoesCampo { id: string; tex: HTMLCanvasElement; cores: { c1: string; c2: string; c3: string }; lancador?: number; passo?: number; semBase?: boolean; basePronta?: boolean; ambiente?: (g: Pintor) => void }
+export interface OpcoesCampo { id: string; tex: HTMLCanvasElement; cores: { c1: string; c2: string; c3: string }; lancador?: number; passo?: number; semBase?: boolean; basePronta?: boolean; ambiente?: (g: Pintor) => void; jogo?: Game }
 
 /** Desenha um campo inteiro: base parada, luzes, peças em ordem de pintor, palhetas e bolas. */
 export function desenhaCampo(g: Pintor, campo: Campo, v: Vista, cam: Camera, o: OpcoesCampo) {
@@ -199,10 +213,12 @@ export function desenhaCampo(g: Pintor, campo: Campo, v: Vista, cam: Camera, o: 
   } else if (o.passo) { deforma(c, o.tex, v, cam, o.passo); paredes(g, campo, true); }
   else if (!semEtapa.base && !o.basePronta) { const b = camadaBase(o.id, campo, o.tex, v, cam); c.drawImage(b.tela, v.ox - b.mx, v.oy - b.my); }
   const visivel = (y: number) => y > campo.camY - 40 && y < campo.camY + H + 40;
+  const S = g.skin;
+  if (S && o.jogo && !semEtapa.luzR05) S.antesPecas(g, o.jogo);
   if (o.ambiente && !semEtapa.ambiente) o.ambiente(g);
-  if (!semEtapa.luzes) for (const p of campo.pecas) if (p.luzes && visivel(p.y)) p.luzes(g);
+  if (!semEtapa.luzes) for (const p of campo.pecas) if (p.luzes && visivel(p.y)) { const f = S?.luzes[p.tipo]; if (f === null) continue; if (f) f(g, p); else p.luzes(g); }
   const lista: { y: number; f: () => void }[] = [];
-  if (!semEtapa.pecas) for (const p of campo.pecas) if (p.desenhar && visivel(p.y)) lista.push({ y: p.y, f: () => p.desenhar!(g) });
+  if (!semEtapa.pecas) for (const p of campo.pecas) { if (semEtapa['p_' + p.tipo]) continue; const f = S?.pecas[p.tipo]; if ((f || p.desenhar) && visivel(p.y)) lista.push({ y: p.y, f: f ? () => f(g, p) : () => p.desenhar!(g) }); }
   for (const p of campo.pas) lista.push({ y: p.py + 8, f: () => palheta(g, p, o.cores.c1, o.cores.c2) });
   for (const b of campo.bolas) lista.push({ y: b.y + (b.z > 2 ? 400 : 0), f: () => desenhaBola(g, b, o.cores.c1) });
   if (o.lancador !== undefined) lista.push({ y: 770, f: () => { const d = o.lancador! * 16; g.muro(368, 748 + d, 386, 748 + d, 6, '#c9cee6', 5); g.linha([[377, 752 + d, 3], [377, 790, 3]], '#8088aa', 3); } });

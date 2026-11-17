@@ -23,6 +23,7 @@ import { Apresentacao } from './visual/apresentacao';
 import { EfeitosVisuais } from './visual/eventos';
 import { materialDe, visualDe } from './visual/manifesto';
 import { painelDireito, painelEsquerdo } from './visual/paineis';
+import { resolucao } from './visual/r05/sprites';
 
 const tela = document.getElementById('tela') as HTMLCanvasElement, c = tela.getContext('2d')!;
 const audio = new Audio(), efeitos = new Efeitos(), caixa = new Backbox(), pintor = new Pintor(c);
@@ -44,7 +45,7 @@ function ajusta() {
   // aparelho de toque já entra no degrau econômico: dpr 1 e bloom sem desfoque. O gargalo lá é rasterização.
   if (toque && qualidade === 0) { qualidade = 2; efeitos.max = 110; efeitos.simples = true; efeitos.semBloom = true; }
   dpr = Math.min(toque ? 1 : (qualidade >= 3 ? 1 : qualidade >= 2 ? 1.5 : 2), devicePixelRatio || 1); tela.width = Math.round(innerWidth * dpr); tela.height = Math.round(innerHeight * dpr);
-  Q = enquadra(innerWidth, innerHeight);
+  Q = enquadra(innerWidth, innerHeight); resolucao(dpr);
 }
 addEventListener('resize', ajusta); ajusta();
 
@@ -129,7 +130,7 @@ function desenha() {
   const chave = def.id + '|' + tela.width + 'x' + tela.height;
   if (!fundoTela || fundoChave !== chave) {
     const [ft, fc] = novaTela(w, h, dpr); desenhaGabinete(fc, Q, k, def.paleta.fundo, caixa.camadas[0] || null, 0, { luz: visualDe(def.id).luz, metal: materialDe(def.id).metal });
-    pintaBase(fc, 'mesa:' + def.id, J.mesa, texMesa, v, CAM_MESA); caixa.desenha(fc, Q.caixa, null, 0);
+    pintaBase(fc, 'mesa:' + def.id, J.mesa, texMesa, v, CAM_MESA, pintor.skin); caixa.desenha(fc, Q.caixa, null, 0);
     fundoTela = ft; fundoChave = chave;
   }
   c.setTransform(1, 0, 0, 1, 0, 0); if (tr) { c.fillStyle = '#03040b'; c.fillRect(0, 0, tela.width, tela.height); }
@@ -137,7 +138,7 @@ function desenha() {
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
   const vm = { ox: v.ox + tx, oy: v.oy + ty, s: v.s };
   const amb = ambiente && !sem.ambiente ? (g: Pintor) => ambiente!.desenha(g) : undefined;
-  if (!sem.mesa) desenhaCampo(pintor, J.mesa, vm, CAM_MESA, { id: 'mesa:' + def.id, tex: texMesa, cores: k, lancador: J.carregando ? J.carga : 0, basePronta: true, ambiente: amb });
+  if (!sem.mesa) desenhaCampo(pintor, J.mesa, vm, CAM_MESA, { id: 'mesa:' + def.id, tex: texMesa, cores: k, lancador: J.carregando ? J.carga : 0, basePronta: true, ambiente: amb, jogo: J });
   if (!S || T) { efeitos.desenha(pintor); if (!sem.fxv) fxv?.desenha(pintor); }
   if (S && d > 0) {
     if (subDe !== S) { subDe = S; texSub = texturaAndar(def, J, S.nome, S.tipo); }
@@ -180,7 +181,8 @@ function paineis() {
   if (!painelTela || painelChave !== chave || tempo - painelT > 0.125 || tempo < painelT) {
     if (!painelTela || painelChave !== chave) { painelTela = novaTela(innerWidth, innerHeight, dpr)[0]; painelChave = chave; }
     const pc = painelTela.getContext('2d')!; pc.setTransform(dpr, 0, 0, dpr, 0, 0); pc.clearRect(0, 0, innerWidth, innerHeight); painelT = tempo;
-    if (R) painelDireito(pc, R, J!, def, modo === 'eterno' ? salvo.eterno(def.id) : null, tempo, (J as any).ranking || []);
+    const lancar = J!.bolaNaCanaleta() && !J!.sub && J!.estado === 'lancar' && !J!.escolha ? 'SEGURE ESPAÇO E SOLTE PARA LANÇAR' : '';
+    if (R) painelDireito(pc, R, J!, def, modo === 'eterno' ? salvo.eterno(def.id) : null, tempo, (J as any).ranking || [], lancar);
     if (L) { if (!miniCarta) miniCarta = compoe(caixa.camadas); painelEsquerdo(pc, L, J!, def, miniCarta, tempo); }
   }
   // copia só os retângulos dos painéis (não a tela inteira)

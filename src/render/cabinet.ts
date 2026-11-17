@@ -11,6 +11,23 @@ export interface Quadro { w: number; h: number; paisagem: boolean; mesa: Vista; 
 /** Divide a tela, igual em celular e desktop: backbox em cima, mesa em perspectiva embaixo e apron. A mesa é sempre o maior elemento. */
 export function enquadra(w: number, h: number): Quadro {
   const celular = Math.min(w, h) < 560;
+  // R05 · tela larga ("palco"): a mesa ocupa quase toda a altura; o backbox vai para o alto da coluna esquerda,
+  // com a identidade da máquina embaixo dele, e a partida fica numa coluna à direita. Proporção da mesa intacta.
+  if (!celular && w > h * 1.2) {
+    const mt = Math.max(8, h * 0.012), ah = Math.max(34, h * 0.05), s = Math.min((h - mt - ah) / H, w * 0.98 / W), mw = W * s, ox = (w - mw) / 2, e = 26 * s + 18;
+    const colW = Math.min(480, ox - e - 20);
+    if (colW >= 270) {
+      const cxL = (ox - e) / 2, bh = Math.round(Math.min(colW / 1.38, h * 0.42)), caixa = { x: cxL - colW / 2 + 6, y: mt + 6, w: colW, h: bh };
+      const esquerda = { x: caixa.x, y: caixa.y + bh + 14, w: colW, h: h - (caixa.y + bh + 14) - ah - 6 };
+      const cxR = w - (w - (ox + mw) - e) / 2, painel = { x: cxR - colW / 2 - 6, y: mt + 6, w: colW, h: h - mt - 12 - ah };
+      return { w, h, paisagem: true, celular, mesa: { ox, oy: mt, s }, caixa, apron: { x: ox, y: mt + H * s, w: mw, h: h - mt - H * s }, painel, esquerda, sacudir: { x: w / 2 - 54, y: h - Math.max(ah, 30), w: 108, h: Math.max(ah, 30) } };
+    }
+  }
+  if (celular) {
+    // celular: backbox um pouco mais baixo (0,22 da altura) para a mesa crescer, sem apertar o painel de pontos
+    const bh = h * 0.22, s = Math.min(h * 0.74 / H, w * 0.98 / W), mw = W * s, ox = (w - mw) / 2, oy = bh, ah = h - bh - H * s, bw = Math.min(w, Math.max(mw, bh * 1.9));
+    return { w, h, paisagem: false, celular, mesa: { ox, oy, s }, caixa: { x: (w - bw) / 2, y: 0, w: bw, h: bh }, apron: { x: ox, y: oy + H * s, w: mw, h: ah }, painel: null, esquerda: null, sacudir: { x: w / 2 - 54, y: h - Math.max(ah, 30), w: 108, h: Math.max(ah, 30) } };
+  }
   const larga = !celular && w > h * 1.2, fb = celular ? 0.24 : larga ? 0.26 : 0.28, fm = celular ? 0.72 : larga ? 0.70 : 0.68, bh = h * fb, s = Math.min(h * fm / H, w * 0.98 / W), mw = W * s, ox = (w - mw) / 2, oy = bh;
   const bw = Math.min(w, Math.max(mw, bh * (larga ? 2.25 : 1.9)));
   const ah = h - bh - H * s;
@@ -83,7 +100,8 @@ export function desenhaBotoes(c: Ctx, q: Quadro, cores: { c1: string; c2: string
     c.font = `800 ${Math.max(11, 13 * v.s)}px Orbitron, sans-serif`; c.fillStyle = 'rgba(255,255,255,0.85)';
     const y = v.oy + H * v.s * 0.83, pisca = 0.55 + Math.sin(t * 5) * 0.35; c.globalAlpha = pisca;
     c.fillText(q.celular ? '◀ TOQUE' : '◀ Z', v.ox + W * v.s * 0.2, y); c.fillText(q.celular ? 'TOQUE ▶' : 'M ▶', v.ox + W * v.s * 0.72, y);
-    if (podeLancar) { c.fillStyle = cores.c1; c.fillText(q.celular ? 'SEGURE À DIREITA E SOLTE PARA LANÇAR' : 'SEGURE ESPAÇO E SOLTE PARA LANÇAR', v.ox + W * v.s * 0.5, v.oy + H * v.s * 0.62); }
+    // instrução de lançamento: no palco do desktop vai para o painel da partida; senão cabe na largura da mesa
+    if (podeLancar && !q.painel) { const s = q.celular ? 'SEGURE À DIREITA E SOLTE PARA LANÇAR' : 'SEGURE ESPAÇO E SOLTE PARA LANÇAR', mx = W * v.s * 0.86; let px = Math.max(10, 13 * v.s); c.font = `800 ${px}px Orbitron, sans-serif`; const m = c.measureText(s).width; if (m > mx) { px *= mx / m; c.font = `800 ${px}px Orbitron, sans-serif`; } c.fillStyle = cores.c1; c.fillText(s, v.ox + W * v.s * 0.5, v.oy + H * v.s * 0.62); }
     c.globalAlpha = 1;
   }
 }

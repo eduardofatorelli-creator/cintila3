@@ -7,6 +7,7 @@ import { Tema, novaTela } from './tema';
 import { materialDe } from '../visual/manifesto';
 import { Pincel, alfa, tom } from '../visual/pincel';
 import { CENAS, infoPadrao } from '../visual/cenas';
+import { skinDe } from '../visual/r05/skin';
 
 type Ctx = CanvasRenderingContext2D;
 const LW = 192, LH = 64, TAU = Math.PI * 2;
@@ -95,6 +96,8 @@ export class Backbox {
   /** pinta a arte de backglass da máquina em 3 camadas */
   static vidro(def: MachineDef, w = 400, h = 228, esc = 2): HTMLCanvasElement[] {
     const telas = [0, 1, 2].map(() => novaTela(w, h, esc)), t = new PincelVidro(telas[0][1], def.paleta, w, h, telas.map(x => x[1]));
+    const sk = skinDe(def.id);
+    if (sk) { try { sk.vidro(telas.map(x => x[1]), w, h, def); return telas.map(x => x[0]); } catch (e) { console.warn(e); for (const x of telas) x[1].clearRect(0, 0, w, h); } }
     def.vidro(telas[0][1], t);
     // Visual R04: a camada de fundo vira a cena autoral da máquina (o céu do tablado), e as camadas da frente continuam as da máquina
     const cena = CENAS[def.id];
@@ -105,7 +108,8 @@ export class Backbox {
     }
     return telas.map(x => x[0]);
   }
-  carrega(def: MachineDef) { this.camadas = Backbox.vidro(def); this.metal = materialDe(def.id).metal; this.molduraChave = ''; this.fila = []; this.atual = null; }
+  premium = false;
+  carrega(def: MachineDef) { this.camadas = Backbox.vidro(def); this.metal = materialDe(def.id).metal; this.premium = !!skinDe(def.id)?.moldura; this.molduraChave = ''; this.fila = []; this.atual = null; }
   recebe(an: Anuncio[]) {
     for (const a of an) {
       if (!ANIMS[a.tipo]) continue;
@@ -188,7 +192,7 @@ export class Backbox {
   }
   /** moldura do backbox: aro de metal, reflexo no vidro, painel de alto-falantes com grade e aro do painel de pontos */
   private molduraDe(r: Ret, k: { c1: string; c2: string; c3: string }, m: number): HTMLCanvasElement {
-    const W2 = Math.ceil(r.w), H2 = Math.ceil(r.h), chave = W2 + 'x' + H2 + this.metal.join() + k.c1;
+    const W2 = Math.ceil(r.w), H2 = Math.ceil(r.h), chave = W2 + 'x' + H2 + this.metal.join() + k.c1 + this.premium;
     if (this.moldura && this.molduraChave === chave) return this.moldura;
     const [tela, c] = novaTela(W2, H2), M = this.metal;
     const dw = Math.min(r.w - m * 4, (r.h * 0.5) * 3), dh = dw / 3, dx = (r.w - dw) / 2, dy = r.h - dh - m * 1.6;
@@ -210,6 +214,7 @@ export class Backbox {
     const ga = c.createLinearGradient(0, 0, 0, r.h); ga.addColorStop(0, M[2]); ga.addColorStop(0.08, M[1]); ga.addColorStop(0.5, M[0]); ga.addColorStop(0.92, M[1]); ga.addColorStop(1, M[0]);
     c.strokeStyle = ga; c.lineWidth = m; c.strokeRect(m / 2, m / 2, r.w - m, r.h - m);
     c.strokeStyle = alfa(k.c2, 0.9); c.lineWidth = 1.2; c.strokeRect(m + 0.5, m + 0.5, r.w - m * 2 - 1, r.h - m * 2 - 1);
+    if (this.premium) premiumMoldura(c, r.w, r.h, m, dx, dy, dw, dh, k);
     this.moldura = tela; this.molduraChave = chave; return tela;
   }
   /** grade de pontos por cima do painel */
@@ -222,6 +227,20 @@ export class Backbox {
     this.mascara = tela; this.mascW = w; return tela;
   }
 }
+/** R05: cabeça de gabinete premium — laterais de metal anodizado com frisos, parafusos, faixa de luz no topo e vidro com reflexo */
+function premiumMoldura(c: Ctx, w: number, h: number, m: number, dx: number, dy: number, dw: number, dh: number, k: { c1: string; c2: string; c3: string }) {
+  const e = Math.max(6, m * 1.6);
+  const lado = c.createLinearGradient(0, 0, e, 0); lado.addColorStop(0, '#0a0818'); lado.addColorStop(0.4, '#2c2258'); lado.addColorStop(0.7, '#5a4aa0'); lado.addColorStop(1, '#14102c');
+  c.fillStyle = lado; c.fillRect(0, 0, e, h); c.save(); c.translate(w, 0); c.scale(-1, 1); c.fillRect(0, 0, e, h); c.restore();
+  const topo = c.createLinearGradient(0, 0, 0, e); topo.addColorStop(0, '#0a0818'); topo.addColorStop(0.5, '#3a2f70'); topo.addColorStop(1, '#14102c'); c.fillStyle = topo; c.fillRect(0, 0, w, e);
+  const fx = c.createLinearGradient(0, 0, w, 0); fx.addColorStop(0, alfa(k.c1, 0)); fx.addColorStop(0.5, alfa(k.c1, 0.95)); fx.addColorStop(1, alfa(k.c1, 0)); c.fillStyle = fx; c.fillRect(e, e - 2, w - e * 2, 2);
+  for (const [cor, l, o] of [['#05040c', 3, 0], ['#b9c3e4', 1.6, -0.6], ['#ffffff', 0.5, -1.1]] as [string, number, number][]) { c.strokeStyle = cor; c.lineWidth = l; c.strokeRect(e + o, e + o, w - e * 2 - o * 2, h - e * 2 - o * 2); }
+  c.strokeStyle = alfa(k.c2, 0.8); c.lineWidth = 1; for (const x of [e * 0.35, w - e * 0.35]) { c.beginPath(); c.moveTo(x, e); c.lineTo(x, h - e); c.stroke(); }
+  for (const [x, y] of [[e / 2, e / 2], [w - e / 2, e / 2], [e / 2, h - e / 2], [w - e / 2, h - e / 2], [e / 2, h / 2], [w - e / 2, h / 2]]) { const g = c.createRadialGradient(x - 1, y - 1, 0, x, y, e * 0.28); g.addColorStop(0, '#ffffff'); g.addColorStop(0.5, '#9aa3c0'); g.addColorStop(1, '#2a2f45'); c.fillStyle = g; c.beginPath(); c.arc(x, y, e * 0.26, 0, Math.PI * 2); c.fill(); }
+  // vidro do painel de pontos: reflexo diagonal discreto
+  const gv = c.createLinearGradient(dx, dy, dx + dw, dy + dh); gv.addColorStop(0, 'rgba(255,255,255,0)'); gv.addColorStop(0.3, 'rgba(255,255,255,0.06)'); gv.addColorStop(0.36, 'rgba(255,255,255,0)'); c.fillStyle = gv; c.fillRect(dx, dy, dw, dh);
+}
+
 /** Tema do backglass: títulos grandes viram letreiro metálico com contorno */
 class PincelVidro extends Pincel {
   texto(s: string, x: number, y: number, tam: number, cor: string, a = 1, fonte = 'Orbitron') { if (tam >= 24) this.letreiro(s, x, y, tam, cor, tom(cor, -0.55), a, fonte); else super.texto(s, x, y, tam, cor, a, fonte); }
