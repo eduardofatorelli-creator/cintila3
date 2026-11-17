@@ -208,7 +208,8 @@ export class Interface {
       const pr = salvo.prefs(), sl = el('div', 'linha'); sl.style.justifyContent = 'center';
       for (const [rot, k] of [['MÚSICA', 'musica'], ['EFEITOS', 'som'], ['NARRADOR', 'narrador']] as [string, keyof Prefs][]) sl.append(this.botao(rot + ': ' + (pr[k] ? 'SIM' : 'NÃO'), () => { pr[k] = !pr[k]; this.A.prefs(pr); this.pausa(J); }, pr[k] ? 'on' : ''));
       cx.append(sl);
-      if (this.A.emDemo()) { cx.append(el('p', 'fraco', '🧪 Demonstração: aplicar outro recurso nesta mesma partida')); const g = el('div', 'labs'); for (const r of RECURSOS) { const b = this.botao(r.nome, () => { this.fecha(); this.A.continuar(); this.A.recurso(r.id); }); b.innerHTML = r.nome + '<small>' + r.desc + '</small>'; g.append(b); } cx.append(g); cx.style.maxWidth = '760px'; }
+      // cada recurso abre uma demonstração nova (alguns estados não combinam, ex.: não se sobe ao andar durante o modo mago)
+      if (this.A.emDemo()) { cx.append(el('p', 'fraco', '🧪 Demonstração: abrir outro recurso nesta máquina')); const g = el('div', 'labs'); for (const r of RECURSOS) { const b = this.botao(r.nome, () => { this.fecha(); this.A.demo(J.def.id, r.id); }); b.innerHTML = r.nome + '<small>' + r.desc + '</small>'; g.append(b); } cx.append(g); cx.style.maxWidth = '760px'; }
     }
     v.append(cx); this.raiz.append(v);
   }
