@@ -38,7 +38,7 @@ Data: 17/11/2026. Branch `visual-r04`. Medido nesta máquina (Windows, Chrome in
 
 1. 30 máquinas carregam e iniciam conforme o progresso: e2e + visual. ✔
 2. Mapa não abre bloqueada: visual.mjs (clique forçado num cartão trancado mantém o estado `menu`). ✔
-3. Colisões e movimentos inalterados: nenhum arquivo de `core/`, `game/` ou `machines/` mudou (`git diff main --stat`); dreno idêntico. ✔
+3. Colisões e movimentos inalterados: `git diff main --stat -- src/core src/game src/machines` mostra só `core/storage.ts` (a preferência `curtas`, 2 linhas); física, geometria, regras e máquinas intactas; dreno idêntico. ✔
 4. Bola visível nos momentos intensos: visual.mjs. ✔ (medido por pixel, não por pessoas)
 5. Chefes, subfases, mago: testes de regra + capturas. ✔
 6. Modo eterno: e2e. ✔
