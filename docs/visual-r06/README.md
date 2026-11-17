@@ -76,7 +76,7 @@ Todas usam peças premium, paredes com fio de luz próprio, insertos de estado, 
 | `test/atracao.mjs` | — | passa |
 | `test/audio.mjs` | aprovado | aprovado |
 | Capturas em partida | Aurora | 30 máquinas × 2 tamanhos + 5 tamanhos de tela + intensos |
-| Build | 331,9 kB | 417,2 kB (140,4 kB gzip) |
+| Build | 331,9 kB | 418,4 kB (140,7 kB gzip) |
 
 ## 5. Desempenho
 
