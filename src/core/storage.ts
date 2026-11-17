@@ -3,7 +3,7 @@ const P = 'cintila3.';
 function ler<T>(k: string, padrao: T): T { try { const v = localStorage.getItem(P + k); return v === null ? padrao : JSON.parse(v) as T; } catch { return padrao; } }
 function gravar(k: string, v: unknown) { try { localStorage.setItem(P + k, JSON.stringify(v)); } catch { /* armazenamento indisponível */ } }
 
-export interface Prefs { som: boolean; musica: boolean; narrador: boolean; canhoto: boolean }
+export interface Prefs { som: boolean; musica: boolean; narrador: boolean; canhoto: boolean; curtas: boolean }
 export const salvo = {
   desbloqueadas: () => Math.max(1, ler('desbloqueadas', 1)),
   desbloqueia(n: number) { if (n > this.desbloqueadas()) gravar('desbloqueadas', n); },
@@ -17,7 +17,7 @@ export const salvo = {
   sobeMestria(id: string) { const m = Math.min(10, this.mestria(id) + 1); gravar('mestria.' + id, m); return m; },
   eterno: (id: string) => ler<{ tempo: number; pontos: number }>('eterno.' + id, { tempo: 0, pontos: 0 }),
   registraEterno(id: string, tempo: number, pontos: number): boolean { const e = this.eterno(id); if (tempo > e.tempo) { gravar('eterno.' + id, { tempo, pontos: Math.max(pontos, e.pontos) }); return true; } return false; },
-  prefs: () => ({ som: true, musica: true, narrador: true, canhoto: false, ...ler<Partial<Prefs>>('prefs', {}) }) as Prefs,
+  prefs: () => ({ som: true, musica: true, narrador: true, canhoto: false, curtas: false, ...ler<Partial<Prefs>>('prefs', {}) }) as Prefs,
   gravaPrefs(p: Prefs) { gravar('prefs', p); },
   partidas: () => ler<number>('partidas', 0),
   contaPartida() { gravar('partidas', this.partidas() + 1); },

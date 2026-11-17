@@ -14,9 +14,15 @@ import type { MachineDef } from './machines/_schema';
 import { Backbox, centroDmd, milhar, relogio, textoDmd } from './render/backbox';
 import { Quadro, desenhaBotoes, desenhaGabinete, enquadra, rr } from './render/cabinet';
 import { Efeitos } from './render/effects';
-import { Pintor, desenhaCampo, pintaBase, semEtapa, texturaSub } from './render/playfield';
+import { Pintor, desenhaCampo, pintaBase, semEtapa } from './render/playfield';
 import { Tema, novaTela } from './render/tema';
 import { Interface } from './ui';
+import { aplicaVisual, movimentoReduzido, texturaAndar, texturaMesa } from './visual';
+import { Ambiente } from './visual/ambiente';
+import { Apresentacao } from './visual/apresentacao';
+import { EfeitosVisuais } from './visual/eventos';
+import { materialDe, visualDe } from './visual/manifesto';
+import { painelDireito, painelEsquerdo } from './visual/paineis';
 
 const tela = document.getElementById('tela') as HTMLCanvasElement, c = tela.getContext('2d')!;
 const audio = new Audio(), efeitos = new Efeitos(), caixa = new Backbox(), pintor = new Pintor(c);
@@ -30,6 +36,9 @@ let qualidade = 0, lento = 0, folga = 0;
 const sem: Record<string, boolean> = {}; // desliga etapas do desenho, só para medir (ganchos de teste)
 const toque = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) <= 6;
 let acum = 0, ultimo = 0, tempo = 0, rodando = true, parado = 0, liberou = 0, primeiraBola = true;
+// Visual R04: camadas de apresentação (só leem o jogo)
+const apres = new Apresentacao(); let ambiente: Ambiente | null = null, fxv: EfeitosVisuais | null = null, miniCarta: HTMLCanvasElement | null = null;
+const reduz = movimentoReduzido(); apres.reduzido = reduz; apres.curtas = prefs.curtas;
 
 function ajusta() {
   // aparelho de toque já entra no degrau econômico: dpr 1 e bloom sem desfoque. O gargalo lá é rasterização.
@@ -41,9 +50,13 @@ addEventListener('resize', ajusta); ajusta();
 
 function carrega(d: MachineDef, m: ModoJogo, atracao = false) {
   def = d; modo = m;
-  const [t, tc] = novaTela(W, H, 2); d.arte(tc, new Tema(tc, d.paleta, W, H)); texMesa = t;
   caixa.carrega(d); fundoChave = '';
   J = new Game(d, m, atracao ? 0 : salvo.mestria(d.id), (Date.now() % 100000) + 1);
+  // tablado autoral da máquina (cena + acabamento), lendo as posições reais das peças já montadas
+  texMesa = texturaMesa(d, J); subDe = null; aplicaVisual(pintor, d.id);
+  const vis = visualDe(d.id); ambiente = new Ambiente(vis.ambiente, d.paleta, toque ? 18 : 30); ambiente.reduzido = reduz;
+  fxv = new EfeitosVisuais(vis.choque, vis.particula, d.paleta); fxv.reduzido = reduz; fxv.maxPs = toque ? 40 : 70; miniCarta = null;
+  { const ev0 = J.ev.bind(J), Jv = J, fx = fxv; Jv.ev = (tp, b, dd) => { ev0(tp, b, dd); try { fx.observa(tp, b, dd, Jv.m.chefe); } catch { /* a apresentação nunca derruba o jogo */ } }; }
   (J as any).ranking = salvo.ranking(d.id);
   J.saidaSom = atracao ? null : (n, p) => audio.toca(n, p); J.saidaFala = atracao ? null : s => audio.fala(s);
   liberou = 0; primeiraBola = !atracao;
@@ -53,13 +66,14 @@ function carrega(d: MachineDef, m: ModoJogo, atracao = false) {
   robo = atracao ? new Robo(J, Math.random, 0.85) : null;
   audio.tema(d.bpm, d.escala, d.raiz); if (!atracao) audio.liga(); else audio.desliga();
   estado = atracao ? 'atracao' : 'jogo'; acum = 0; efeitos.ps.length = 0;
+  if (atracao) apres.inicia(d, true), apres.encerra(); else apres.inicia(d, !!J.escolha);
 }
 
 const ui = new Interface({
   jogar: (id, m) => { audio.inicia(); carrega(porId(id), m); },
   menu: () => { estado = 'menu'; J = null; audio.desliga(); parado = 0; },
   continuar: () => { if (estado === 'pausa') estado = 'jogo'; },
-  prefs: p => { prefs = p; audio.som = p.som; audio.musica = p.musica; audio.narrador = p.narrador; salvo.gravaPrefs(p); },
+  prefs: p => { prefs = p; audio.som = p.som; audio.musica = p.musica; audio.narrador = p.narrador; apres.curtas = p.curtas; salvo.gravaPrefs(p); },
   som: () => { audio.inicia(); audio.toca('faixa'); },
   vidro: d => Backbox.vidro(d, 400, 228, 0.6),
 });
@@ -72,7 +86,7 @@ ligaEntrada(tela, {
   confirma: () => { if (J?.escolha) J.escolher(J.escolha.i); },
   zonaSacudir: () => Q.sacudir, podeLancar: () => !!J && !!J.bolaNaCanaleta() && !J.sub,
   ativo: () => estado === 'jogo',
-  acorda: () => { parado = 0; audio.inicia(); if (estado === 'atracao') { estado = 'menu'; J = null; ui.menu(); } },
+  acorda: () => { parado = 0; audio.inicia(); apres.pula(); if (estado === 'atracao') { estado = 'menu'; J = null; ui.menu(); } },
 }, () => prefs.canhoto);
 addEventListener('pointerdown', () => { parado = 0; });
 // clique direto numa carta de escolha
@@ -90,7 +104,8 @@ function passo(dt: number) {
   acum = Math.min(acum + dt, DT * 8);
   while (acum >= DT) { robo?.passo(DT); J.update(DT); acum -= DT; }
   if (estado === 'atracao' && J.estado === 'fim') { estado = 'menu'; J = null; ui.menu(); return; }
-  efeitos.recebe(J.fxs); efeitos.passo(dt); caixa.recebe(J.anuncios); caixa.passo(dt);
+  efeitos.recebe(J.fxs); efeitos.passo(dt); apres.observa(J.anuncios, J.cores); caixa.recebe(J.anuncios); caixa.passo(dt);
+  apres.passo(dt); fxv?.passo(dt); if (ambiente) { ambiente.forca = (J.mago ? 2 : J.multibola ? 1.4 : 1) * (qualidade >= 2 ? 0.6 : 1); ambiente.passo(dt); }
   audio.nivel = J.mago ? 4 : J.multibola ? 3 : J.intensidade > 0.3 || J.sub ? 2 : 1; audio.progressao = J.sub ? 1 : 0;
 }
 
@@ -113,7 +128,7 @@ function desenha() {
   // fundo parado (gabinete + tablado + backglass): pintado uma vez por máquina e por tamanho de tela, depois é só uma cópia por quadro
   const chave = def.id + '|' + tela.width + 'x' + tela.height;
   if (!fundoTela || fundoChave !== chave) {
-    const [ft, fc] = novaTela(w, h, dpr); desenhaGabinete(fc, Q, k, def.paleta.fundo, caixa.camadas[0] || null, 0);
+    const [ft, fc] = novaTela(w, h, dpr); desenhaGabinete(fc, Q, k, def.paleta.fundo, caixa.camadas[0] || null, 0, { luz: visualDe(def.id).luz, metal: materialDe(def.id).metal });
     pintaBase(fc, 'mesa:' + def.id, J.mesa, texMesa, v, CAM_MESA); caixa.desenha(fc, Q.caixa, null, 0);
     fundoTela = ft; fundoChave = chave;
   }
@@ -121,13 +136,11 @@ function desenha() {
   if (!sem.fundo) c.drawImage(fundoTela, Math.round(tx * dpr), Math.round(ty * dpr)); else { c.fillStyle = '#03040b'; c.fillRect(0, 0, tela.width, tela.height); }
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
   const vm = { ox: v.ox + tx, oy: v.oy + ty, s: v.s };
-  if (!sem.mesa) desenhaCampo(pintor, J.mesa, vm, CAM_MESA, { id: 'mesa:' + def.id, tex: texMesa, cores: k, lancador: J.carregando ? J.carga : 0, basePronta: true });
-  if (!S || T) efeitos.desenha(pintor);
-  // luz de ambiente por modo
-  const amb = J.mago ? `rgba(255,255,255,${0.05 + Math.sin(tempo * 8) * 0.04})` : J.multibola ? 'rgba(255,200,60,0.09)' : J.m.chefe.vida === 1 && !J.m.chefe.c.off ? `rgba(255,30,60,${0.06 + Math.sin(tempo * 5) * 0.03})` : '';
-  if (amb) { c.fillStyle = amb; c.fillRect(v.ox, v.oy, W * v.s, H * v.s); }
+  const amb = ambiente && !sem.ambiente ? (g: Pintor) => ambiente!.desenha(g) : undefined;
+  if (!sem.mesa) desenhaCampo(pintor, J.mesa, vm, CAM_MESA, { id: 'mesa:' + def.id, tex: texMesa, cores: k, lancador: J.carregando ? J.carga : 0, basePronta: true, ambiente: amb });
+  if (!S || T) { efeitos.desenha(pintor); if (!sem.fxv) fxv?.desenha(pintor); }
   if (S && d > 0) {
-    if (subDe !== S) { subDe = S; texSub = texturaSub(k, def.paleta.fundo, S.nome, S.tipo); }
+    if (subDe !== S) { subDe = S; texSub = texturaAndar(def, J, S.nome, S.tipo); }
     c.fillStyle = `rgba(0,0,6,${0.62 * d})`; c.fillRect(v.ox - 30, v.oy - 10, W * v.s + 60, H * v.s + 20);
     const desce = def.andar.desce && S.origem === 'andar' ? -1 : 1;
     const f = 0.9 + 0.1 * cm, vs = { ox: v.ox + W * v.s * (1 - f) / 2 + tx, oy: v.oy - desce * (1 - saida(d)) * (H * v.s + 160) - (1 - cm) * 30 * v.s + ty, s: v.s * f };
@@ -135,15 +148,21 @@ function desenha() {
     // sombra projetada sobre a mesa principal
     c.fillStyle = `rgba(0,0,0,${0.4 * d * (1 - cm)})`; c.beginPath(); c.ellipse(v.ox + W * v.s / 2, v.oy + H * v.s * (0.35 + 0.3 * d), W * v.s * 0.5, H * v.s * 0.2, 0, 0, Math.PI * 2); c.fill();
     desenhaCampo(pintor, S.campo, vs, cam, { id: 'sub', tex: texSub!, cores: k, passo: cm > 0 && cm < 1 ? 8 : 0, semBase: S.rolagem });
-    if (!T) efeitos.desenha(pintor);
+    if (!T) { efeitos.desenha(pintor); fxv?.desenha(pintor); }
   }
   if (!efeitos.semBloom) efeitos.compoeBloom(c, w, h);
+  // bordas de estado (chefe, mago, multibola), transições e reflexo do vidro: só nas margens da mesa
+  if (!sem.apres) { apres.bordas(c, v, J); apres.transicao(c, v, J); if (!S && qualidade < 3) apres.reflexo(c, v, dpr); }
   const b0 = J.campo.bolas[0];
   if (!sem.caixa) caixa.desenha(c, Q.caixa, estado === 'atracao' ? null : J, tempo, b0 ? clamp(b0.x / W, 0, 1) : 0.5, b0 ? clamp((b0.y - J.campo.camY) / H, 0, 1) : 0.5, atracaoDmd, efeitos.semBloom);
-  if (Q.painel) lateral(Q.painel);
-  if (estado !== 'atracao') desenhaBotoes(c, Q, k, J.carregando ? J.carga : 0, !!J.bolaNaCanaleta() && !S, tempo, primeiraBola && J.estado === 'lancar' && !J.escolha);
+  if (!sem.apres && estado !== 'atracao') apres.letreiro(c, Q.caixa);
+  if (Q.painel) painelDireito(c, Q.painel, J, def, modo === 'eterno' ? salvo.eterno(def.id) : null, tempo, (J as any).ranking || []);
+  if (Q.esquerda) { if (!miniCarta) miniCarta = compoe(caixa.camadas); painelEsquerdo(c, Q.esquerda, J, def, miniCarta, tempo); }
+  if (estado !== 'atracao') desenhaBotoes(c, Q, k, J.carregando ? J.carga : 0, !!J.bolaNaCanaleta() && !S, tempo, primeiraBola && J.estado === 'lancar' && !J.escolha && !apres.emEntrada);
   if (J.escolha) cartas();
-  if (J.flash > 0) { c.globalAlpha = Math.min(0.5, J.flash * 0.5); c.fillStyle = J.flashCor; c.fillRect(0, 0, w, h); c.globalAlpha = 1; }
+  // clarão de evento: mais contido que antes (e quase nulo com movimento reduzido) para não ofuscar a bola
+  if (J.flash > 0) { c.globalAlpha = Math.min(reduz ? 0.1 : 0.3, J.flash * 0.3); c.fillStyle = J.flashCor; c.fillRect(0, 0, w, h); c.globalAlpha = 1; }
+  if (estado === 'jogo') apres.desenhaEntrada(c, v, Q.celular);
   if (T && T.dir > 0 && T.t < 0.2) { c.fillStyle = `rgba(0,0,0,${T.t * 2})`; c.fillRect(0, 0, w, h); }
   if (estado === 'atracao') { c.font = `800 ${Math.max(16, 22 * v.s)}px Orbitron, sans-serif`; c.textAlign = 'center'; c.fillStyle = Math.floor(tempo * 2) % 2 ? '#fff' : k.c1; c.fillText(Q.celular ? 'TOQUE PARA JOGAR' : 'APERTE QUALQUER TECLA', v.ox + W * v.s / 2, v.oy + H * v.s * 0.5); }
 }
@@ -155,7 +174,10 @@ function atracaoDmd(d: CanvasRenderingContext2D, t: number) {
   else { centroDmd(d, salvo.desbloqueadas() + ' DE ' + MAQUINAS.length + ' MÁQUINAS', 20, 8, '#fff'); centroDmd(d, 'APERTE START', 44, 10, Math.floor(t * 4) % 2 ? '#ffd24a' : '#553'); }
 }
 
-/** painel lateral em paisagem: missões, evoluções e controles */
+/** junta as 3 camadas do backglass numa imagem só (cartão do painel esquerdo) */
+function compoe(cam: HTMLCanvasElement[]) { if (!cam.length) return null; const [t, x] = novaTela(cam[0].width, cam[0].height); for (const k of cam) x.drawImage(k, 0, 0); return t; }
+
+/** painel lateral antigo (mantido para referência; o R04 usa visual/paineis.ts) */
 function lateral(r: { x: number; y: number; w: number; h: number }) {
   if (!J || r.h < 120) return; const k = J.cores; let y = r.y + 8; const lh = Math.max(15, Math.min(22, r.h / 17));
   const L = (s: string, cor = '#cdd3f5', neg = false) => { c.font = `${neg ? 800 : 500} ${lh * 0.62}px Orbitron, sans-serif`; c.textAlign = 'left'; c.textBaseline = 'top'; c.fillStyle = cor; c.fillText(s, r.x + 6, y); y += lh; };
@@ -209,6 +231,8 @@ if (import.meta.env.DEV) {
     enterUpper: (tipo?: any) => { if (!J) return false; const b = J.mesa.bolas[0] || J.novaNaCanaleta(); J.estado = 'jogo'; J.sobe(b, J.m.portal, tipo); return !!J.sub; },
     enterArena: (tipo: string) => { if (!J) return false; const b = J.mesa.bolas[0] || J.novaNaCanaleta(); J.estado = 'jogo'; J.iniciaTrans(criaArena(J, tipo), b, J.m.portal); return !!J.sub; },
     mago: () => J?.iniciaMago(),
+    pulaIntro: () => apres.encerra(),
+    get apres() { return apres; },
     /** seção 12.4: tempo de quadro com 4 bolas e 300 partículas */
     medeQuadros: (n = 2000) => {
       if (!J) return null; rodando = false; J.estado = 'jogo';
